@@ -1,0 +1,27 @@
+# --- set img path and savedir --- #
+img_path: '/path/to/image'
+outdir: '/path/to/outdir'
+
+
+crop:
+  crop_left: 0.15
+  crop_right: 0.15
+  crop_top: 0.1
+  crop_bottom: 0.1
+mask:
+  binmask_path: '/path/to/mask'
+lbp:
+  patchsize: 100
+  ncpus: 30
+  outfile_name: 'lbp_result.npy'
+  img_name: 'lbp_result'
+umap:
+  n_components: 20
+  n_neighbors: 30
+  min_dist: 0.0 
+  random_state: 42
+hdbscan:
+  min_samples: 1
+  min_cluster_size: 300
+  cluster_selection_epsilon: 0.0
+  gen_min_span_tree: True
