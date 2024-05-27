@@ -8,8 +8,7 @@ crop:
   crop_right: 0.15
   crop_top: 0.1
   crop_bottom: 0.1
-mask:
-  binmask_path: '/path/to/mask'
+mask: '/path/to/mask' # 'auto' to calculate using Otsu's method, leave blank to run without mask
 lbp:
   patchsize: 100
   ncpus: 30
