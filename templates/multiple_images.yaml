@@ -1,6 +1,13 @@
 # --- set img path and savedir --- #
 imgs_dir: '/path/to/images/dir'
-masks_dir: '/path/to/masks/dir'
+
+# Available options for 'masks' parameter:
+#   - '/path/to/masks/dir': to use path to the dir with masks
+#   - 'auto': to calculate masks using Otsu's method
+#   - '' or don't specify at all to run the pipeline on the whole images
+masks: '/path/to/masks/dir'
+
+
 outdir: '/path/to/outdir'
 
 crop:

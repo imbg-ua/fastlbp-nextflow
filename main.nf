@@ -6,34 +6,78 @@ debug_flag = true
 params.annot_suffix = "annotation"
 
 // Default params
-params.masks_dir = ""
+params.masks = ""
 params.imgs_dir = ""
 params.img_path = ""
+params.mask = ""
 
-process fastlbp {
-    tag "${img.getBaseName()}"
+
+process get_tissue_mask {
+    tag "${img_id}"
     debug debug_flag
-    publishDir "${params.outdir}/${img.getBaseName()}", mode: "copy"
+    publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
-    tuple path(img), path(mask)
+    path(img)
+
+    output:
+    tuple path(img), path('pixelmask.npy')
+
+    script:
+    img_id = img.getBaseName()
+    """
+    get_mask.py get_mask \
+        --img_path ${img} \
+    """
+}
+
+process downscale_mask {
+    tag "${img_id}"
+    debug debug_flag
+    publishDir "${params.outdir}/${img_id}", mode: "copy"
+
+    input:
+    tuple path(img), path(pixelmask)
+
+    output:
+    tuple path(img), path(pixelmask), path(savefile)
+
+    script:
+    img_id = img.getBaseName()
+    savefile = "patchmask.npy"
+    """
+    get_mask.py downscale_using_patchsize \
+        --img_path ${pixelmask} \
+        --patchsize ${params.lbp.patchsize} \
+        --savefile ${savefile}
+    """
+
+}
+
+process fastlbp {
+    tag "${img_id}"
+    debug debug_flag
+    publishDir "${params.outdir}/${img_id}", mode: "copy"
+
+    input:
+    tuple path(img), path(mask), path(patchmask)
 
     output:
     path("data")
-    path("data/out/${params.lbp.outfile_name}"), emit: lbp_result_file
-    tuple path("data/out/${file(params.lbp.outfile_name).getBaseName()}_flattened.npy"), val("${img.getBaseName()}"), emit: lbp_result_file_flattened
-    path("patchmask.npy"), emit: lbp_patchmask, optional: true
-    path("pixelmask.npy"), emit: lbp_pixelmask, optional: true
+    tuple path("data/out/${file(params.lbp.outfile_name).getBaseName()}_flattened.npy"), val(img_id), emit: lbp_result_file_flattened
 
     script:
+    img_id = img.getBaseName()
     mask_path = mask ? "--img_mask ${mask}" : ""
+    patchmask_path = patchmask ? "--patch_mask ${patchmask}" : ""
     """
-    lbp.py \
+    run_lbp.py \
         --img_path ${img} \
         --patchsize ${params.lbp.patchsize} \
         --ncpus ${params.lbp.ncpus} \
         --outfile_name ${params.lbp.outfile_name} \
         ${mask_path} \
+        ${patchmask_path} \
         --img_name ${params.lbp.img_name}
     """
 }
@@ -64,7 +108,8 @@ process hdbscan {
     tuple path(data), val(img_id)
 
     output:
-    path("hdbscan_labels.npy")
+    path("hdbscan_labels.npy"), emit: labels_path
+    val(img_id), emit: img_id
 
     script:
     """
@@ -78,21 +123,70 @@ process hdbscan {
 }
 
 workflow SingleImage {
-    fastlbp([params.img_path, params.mask.binmask_path ? file(params.mask.binmask_path) : []])
-    umap(fastlbp.out.lbp_result_file_flattened) | hdbscan
+    if ( !params.mask ) {
+
+        log.info("No mask mode")
+
+        no_mask = Channel.of([params.img_path, [], []])
+        fastlbp(no_mask)
+        umap(fastlbp.out.lbp_result_file_flattened) | hdbscan
+
+    } else if ( params.mask == "auto" ) {
+
+        log.info("Otsu mask mode")
+
+        img = Channel.of([params.img_path])
+        get_tissue_mask(img) | downscale_mask | fastlbp
+        umap(fastlbp.out.lbp_result_file_flattened) | hdbscan
+        
+    } else {
+        
+        log.info("Provided mask mode")
+
+        img_and_mask = Channel.of([params.img_path, file(params.mask)])
+        downscale_mask(img_and_mask) | fastlbp
+        umap(fastlbp.out.lbp_result_file_flattened) | hdbscan
+
+    }
 }
 
 workflow MultiImage {
     imgs = files("${params.imgs_dir}/*")
-    
-    imgs_and_masks = Channel.fromList(imgs)
-        .map {it -> [
-            it,
-            params.masks_dir ? file(params.masks_dir) \
-            / it.getBaseName() + "_${params.annot_suffix}." + it.getExtension() : []
-            ]}
-    fastlbp(imgs_and_masks)
-    umap(fastlbp.out.lbp_result_file_flattened) | hdbscan
+
+    if ( !params.masks ) {
+
+        log.info("No mask mode")
+
+        imgs_and_masks = Channel.fromList(imgs)
+            .map {it -> [
+                it, [], []
+                ]}
+        fastlbp(imgs_and_masks)
+        umap(fastlbp.out.lbp_result_file_flattened) | hdbscan
+
+    } else if ( params.masks == "auto" ) {
+
+        log.info("Otsu mask mode")
+
+        imgs_and_masks = Channel.fromList(imgs)
+        get_tissue_mask(imgs_and_masks) | downscale_mask | fastlbp
+        umap(fastlbp.out.lbp_result_file_flattened) | hdbscan
+        
+    } else {
+        
+        log.info("Provided mask mode")
+
+        imgs_and_masks = Channel.fromList(imgs)
+            .map {it -> [
+                it,
+                file(params.masks) \
+                / it.getBaseName() + "_${params.annot_suffix}." + it.getExtension()
+                ]}
+        
+        downscale_mask(imgs_and_masks) | fastlbp
+        umap(fastlbp.out.lbp_result_file_flattened) | hdbscan
+
+    }
 }
 
 workflow Pipeline {
