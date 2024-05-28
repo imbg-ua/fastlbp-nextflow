@@ -108,8 +108,7 @@ process hdbscan {
     tuple path(data), val(img_id)
 
     output:
-    path("hdbscan_labels.npy"), emit: labels_path
-    val(img_id), emit: img_id
+    tuple path("hdbscan_labels.npy"), val(img_id)
 
     script:
     """
@@ -119,6 +118,26 @@ process hdbscan {
         --min_cluster_size ${params.hdbscan.min_cluster_size} \
         --cluster_selection_epsilon ${params.hdbscan.cluster_selection_epsilon} \
         --gen_min_span_tree ${params.hdbscan.gen_min_span_tree}
+    """
+}
+
+process labels_to_patch_img {
+    debug debug_flag
+    publishDir "${params.outdir}/${img_id}", mode: "copy"
+
+    input:
+    tuple path(patchmask), path(labels_data), val(img_id)
+
+    output:
+    tuple path(savefile), val(img_id)
+
+    script:
+    savefile = "patch_labels.npy"
+    """
+    deconvolve_masked_labels.py labels_to_patch_img \
+        --np_labels_path ${labels_data} \
+        --np_mask_path ${patchmask} \
+        --savefile ${savefile}
     """
 }
 
@@ -136,8 +155,33 @@ workflow SingleImage {
         log.info("Otsu mask mode")
 
         img = Channel.of([params.img_path])
-        get_tissue_mask(img) | downscale_mask | fastlbp
+        get_tissue_mask(img) | downscale_mask
+
+        downscale_mask.out
+            .map { img_path, pixelmask_path, patchmask_path ->
+                [
+                    patchmask_path, 
+                    img_path.getBaseName()
+                ]
+             }
+            .set { img_id_and_mask_ch }
+
+        fastlbp(downscale_mask.out)
         umap(fastlbp.out.lbp_result_file_flattened) | hdbscan
+        
+        img_id_and_mask_ch
+            .join(hdbscan.out, by:1)
+            .map {
+                imd_id, patchmask_path, clustering_labels_path -> 
+                    [
+                        patchmask_path, 
+                        clustering_labels_path, 
+                        imd_id
+                    ]
+            } 
+            .set { deconvolve_ch }
+
+        labels_to_patch_img(deconvolve_ch)
         
     } else {
         
