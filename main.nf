@@ -12,7 +12,6 @@ params.img_path = ""
 params.mask = ""
 
 
-
 def createCombinations(method_params) {
     def channels = method_params.collect { key, values -> values instanceof List ? \
     Channel.of([key, values]).transpose() : Channel.of([key, values])} // Channel.from()
@@ -21,7 +20,7 @@ def createCombinations(method_params) {
 
     // https://github.com/nextflow-io/nextflow/issues/1403
     channels.tail().each {
-        combinedChannel = combinedChannel.combine(it.map { ss -> [ss] })
+        combinedChannel = combinedChannel.combine(it.map { itit -> [itit] })
     }
 
     combinedChannel
@@ -31,66 +30,27 @@ def lbp_combinations = createCombinations(params.lbp)
 def umap_combinations = createCombinations(params.umap)
 def hdbscan_combinations = createCombinations(params.hdbscan)
 
-
 lbp_combinations.combine(umap_combinations.combine(hdbscan_combinations)).set {all_parameters_combinations}
 
-// all_parameters_combinations.view()
+process generate_params_combinations_dir {
+    debug debug_flag
+    publishDir "${params.outdir}", mode: "copy"
 
-// all_parameters_combinations.map { it -> it.flatten() }. set { flattened_all_parameters }
+    input:
+    val(params_combination_string)
 
-// flattened_all_parameters.view()
+    output:
+    path(outfile_name)
 
-// def createCombinations(method_params) {
-//     def channels = method_params.collect { key, values -> values instanceof List ? \
-//     [key, Channel.fromList(values)] : [key, Channel.of(values)]} // Channel.from()
-//     def combinedChannel = channels[0][1]
-//     def methods_names = [channels[0][0]]
-//     channels.tail().each { key, value -> 
-//         combinedChannel = combinedChannel.combine(value)
-//         methods_names.add(key) }
+    script:
+    outfile_name = "hash_to_combination.tsv"
+    """
+    params_to_hash.py \
+        --params_list_str "${params_combination_string}" \
+        --savefile ${outfile_name}
+    """
+}
 
-//     methods_names_ch = Channel.fromList(methods_names)
-
-//     combinedChannel.combine(methods_names_ch)
-// }
-
-// def umap_combinations = createCombinations(params.umap).view()
-// def hdbscan_combinations = createCombinations(params.hdbscan)
-
-// def createCombinations(method_params) {
-//     def channels = method_params.collect { key, values -> values instanceof List ? \
-//     Channel.fromList(values) : Channel.of(values)} // Channel.from()
-//     def combinedChannel = channels[0]
-//     channels.tail().each { combinedChannel = combinedChannel.combine(it) }
-//     combinedChannel
-// }
-
-// def umap_combinations = createCombinations(params.umap)
-// def hdbscan_combinations = createCombinations(params.hdbscan)
-
-// umap_combinations.combine(hdbscan_combinations).view()
-
-// def createCombinations(params) {
-//     def channels = params.collect { key, values -> Channel.from(values) }
-//     def combinedChannel = channels[0]
-//     channels.tail().each { combinedChannel = combinedChannel.combine(it) }
-//     combinedChannel.map { it.flatten() }
-// }
-
-// def allCombinations = Channel.empty()
-
-
-// def methodCombinations = createCombinations(params.umap)
-// allCombinations = allCombinations.mix(methodCombinations)
-
-// def hdbscan_methodCombinations = createCombinations(params.hdbscan)
-// allCombinations = allCombinations.mix(hdbscan_methodCombinations)
-
-// allCombinations.view()
-
-
-// // Print all combinations
-// allCombinations.subscribe { println it }
 
 process get_tissue_mask {
     tag "${img_id}"
@@ -268,45 +228,57 @@ workflow SingleImage {
 
     run_id = run_id_list.toString().md5()
 
+    parameters_set
+        .map { list -> list.flatten().collect().join('_') }
+        .map { it.toString() }
+        .tap { params_combinations_strings }
+        .map { it.md5() }
+        .set { run_id_ch }
+    // run_id_ch.view()
+    
+    params_combinations_strings
+        .map { [1, it] }
+        .set { params_combinations_strings_transformed }
+
+    run_id_ch
+        .map { [1, it] }
+        .set { run_id_ch_ccc_transformed }
+    
+    params_combinations_strings_transformed.cross(run_id_ch_ccc_transformed)
+        .map { [it[0][1], it[1][1]] }
+        .collect()
+        .set { hashs_and_strings_test }
+
+    
+    generate_params_combinations_dir(hashs_and_strings_test)
+
     if ( !params.mask ) {
 
         log.info("No mask mode")
 
-        no_mask = Channel.of([params.img_path, [], [], run_id])
+        // no_mask = Channel.of([params.img_path, [], [], run_id])
+        run_id_ch
+            .map { [params.img_path, [], [], it] }
+            .set { no_mask }
+        
+        // no_mask.view()
+        // no_mask_new.view()
+
         fastlbp(no_mask, parameters_split.patchsize)
+
+        // fastlbp.out.lbp_result_file_flattened.toList().view()
+        // parameters_split.n_components.toList().view()
+
         umap(fastlbp.out.lbp_result_file_flattened, parameters_split.n_components)
         
         parameters_split.min_samples
-            .cross(parameters_split.min_cluster_size)
-            .cross(parameters_split.cluster_selection_epsilon)
-            .cross(parameters_split.gen_min_span_tree)
+            .combine(parameters_split.min_cluster_size)
+            .combine(parameters_split.cluster_selection_epsilon)
+            .combine(parameters_split.gen_min_span_tree)
+            .distinct()
             .set { all_params_hdbscan_ch }
 
-        all_params_hdbscan_ch.view()
-
-        // parameters_split.min_samples
-        //     // .map { [it] }
-        //     .set { hdbscan_min_samples_ch }
-        // parameters_split.min_cluster_size
-        //     // .map { [it] }
-        //     .set { hdbscan_min_cluster_size_ch }
-
-        // // hdbscan_min_cluster_size_ch.view()
-        // // hdbscan_min_samples_ch.view()
-
-        // hdbscan_min_samples_ch
-        //     .combine(hdbscan_min_cluster_size_ch)
-        //     .view()
-        // paramet ers_split.min_cluster_size.view()
-        
-        // parameters_split.min_samples.cross(parameters_split.min_cluster_size).view()
-        
-        // parameters_split.min_samples.view()
-
-        // [parameters_split.min_samples,
-        // parameters_split.min_cluster_size,
-        // parameters_split.cluster_selection_epsilon,
-        // parameters_split.gen_min_span_tree]
+        // all_params_hdbscan_ch.view()
 
         hdbscan(umap.out, all_params_hdbscan_ch)
 

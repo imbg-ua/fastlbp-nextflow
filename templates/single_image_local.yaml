@@ -11,7 +11,7 @@ crop:
 # mask: '/nfs/lbp_project/Thymus_all/TA11486161/spatial/test_nextflow_annots/tissue_lowres_image_annotation.png'
 # mask: auto
 lbp:
-  patchsize: 50
+  patchsize: [50, 100]
   ncpus: 30
   outfile_name: 'lbp_result.npy'
   img_name: 'lbp_result'
