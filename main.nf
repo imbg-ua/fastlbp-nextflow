@@ -221,64 +221,48 @@ workflow SingleImage {
         }
         .set {parameters_split}
 
-    
-    parameters_set.flatten().collect()
-        .map { list -> list.join('_') }
-        .set { run_id_list }
 
-    run_id = run_id_list.toString().md5()
-
-    parameters_set
-        .map { list -> list.flatten().collect().join('_') }
-        .map { it.toString() }
-        .tap { params_combinations_strings }
-        .map { it.md5() }
-        .set { run_id_ch }
-    // run_id_ch.view()
-    
-    params_combinations_strings
-        .map { [1, it] }
-        .set { params_combinations_strings_transformed }
-
-    run_id_ch
-        .map { [1, it] }
-        .set { run_id_ch_ccc_transformed }
-    
-    params_combinations_strings_transformed.cross(run_id_ch_ccc_transformed)
-        .map { [it[0][1], it[1][1]] }
-        .collect()
-        .set { hashs_and_strings_test }
-
-    
-    generate_params_combinations_dir(hashs_and_strings_test)
-
-    if ( !params.mask ) {
-
-        log.info("No mask mode")
-
-        // no_mask = Channel.of([params.img_path, [], [], run_id])
-        run_id_ch
-            .map { [params.img_path, [], [], it] }
-            .set { no_mask }
-        
-        // no_mask.view()
-        // no_mask_new.view()
-
-        fastlbp(no_mask, parameters_split.patchsize)
-
-        // fastlbp.out.lbp_result_file_flattened.toList().view()
-        // parameters_split.n_components.toList().view()
-
-        umap(fastlbp.out.lbp_result_file_flattened, parameters_split.n_components)
-        
-        parameters_split.min_samples
+    parameters_split.min_samples
             .combine(parameters_split.min_cluster_size)
             .combine(parameters_split.cluster_selection_epsilon)
             .combine(parameters_split.gen_min_span_tree)
             .distinct()
             .set { all_params_hdbscan_ch }
 
-        // all_params_hdbscan_ch.view()
+    
+    parameters_set
+        .map { list -> list.flatten().collect().join('_') }
+        .map { it.toString() }
+        .tap { params_combinations_strings }
+        .map { it.md5() }
+        .set { run_id_ch }
+    
+    params_combinations_strings
+        .map { [1, it] }
+        .set { params_combinations_strings_with_key }
+
+    run_id_ch
+        .map { [1, it] }
+        .set { run_id_ch_with_key }
+    
+    params_combinations_strings_with_key.cross(run_id_ch_with_key)
+        .map { [it[0][1], it[1][1]] }
+        .collect()
+        .set { combinations_to_save }
+
+    generate_params_combinations_dir(combinations_to_save)
+
+    if ( !params.mask ) {
+
+        log.info("No mask mode")
+
+        run_id_ch
+            .map { [params.img_path, [], [], it] }
+            .set { no_mask }
+
+        fastlbp(no_mask, parameters_split.patchsize)
+
+        umap(fastlbp.out.lbp_result_file_flattened, parameters_split.n_components)
 
         hdbscan(umap.out, all_params_hdbscan_ch)
 
