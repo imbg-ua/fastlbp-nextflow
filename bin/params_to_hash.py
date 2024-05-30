@@ -4,7 +4,9 @@ import fire
 
 def main(params_list_str: str, 
     savefile: str='hash_to_combination.tsv') -> None:
-    params_list = list(params_list_str.strip('[]').split(','))
+    # params_list = list(str(params_list_str).strip('[]').split(',')) # obsolete version
+    params_list = list(map(lambda x: x.strip('[ ]'), str(params_list_str).split(',')))
+
     assert len(params_list) % 2 == 0
 
     tsv_content = 'hash\tparameters\n'

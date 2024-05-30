@@ -5,7 +5,7 @@ import numpy as np
 import workflow_utils as ut
 
 
-def labels_to_patch_img(
+def masked_labels_to_patch_img(
     np_labels_path: str, 
     np_mask_path: str,
     increment: int = 2, 
@@ -19,6 +19,21 @@ def labels_to_patch_img(
     labels_img[mask] = labels
 
     np.save(savefile, labels_img)
+
+def labels_to_patch_img( 
+    np_labels_path: str,
+    lbp_output_path: str,
+    increment: int = 2, 
+    savefile: str='patch_labels.npy') -> None:
+
+    labels = np.load(np_labels_path) # dtype = np.int_
+    lbp_res_shape = np.load(lbp_output_path).shape
+
+    labels_img = labels.reshape((lbp_res_shape[0], lbp_res_shape[1], -1))
+    labels_img += increment
+
+    np.save(savefile, labels_img)    
+
 
 def patch_to_pixel_img(
     np_patch_img_path: str,

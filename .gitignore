@@ -1,6 +1,7 @@
 .nextflow.log*
 .nextflow/
 work/
+report*
 
 **/__pycache__/
 

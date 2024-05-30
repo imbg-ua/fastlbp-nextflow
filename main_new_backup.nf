@@ -5,12 +5,6 @@ nextflow.enable.dsl = 2
 debug_flag = true
 params.annot_suffix = "annotation"
 
-// Default params
-params.masks = ""
-params.imgs_dir = ""
-params.img_path = ""
-params.mask = ""
-
 
 def createCombinations(method_params) {
     def channels = method_params.collect { key, values -> values instanceof List ? \
@@ -22,15 +16,33 @@ def createCombinations(method_params) {
     channels.tail().each {
         combinedChannel = combinedChannel.combine(it.map { itit -> [itit] })
     }
-
     combinedChannel
 }
 
-def lbp_combinations = createCombinations(params.lbp)
-def umap_combinations = createCombinations(params.umap)
-def hdbscan_combinations = createCombinations(params.hdbscan)
+def params_args_list = params.args.collect { k, v -> [k, v] }
+
+def lbp_step = params.args.lbp
+def lbp_step_param_num = params.args.lbp.size()
+
+println "${lbp_step_param_num} lbp params num"
+
+def dimred_step = params.args.umap
+def dimred_step_param_num = params.args.umap.size()
+
+println "${dimred_step_param_num} umap params num"
+
+def clust_step = params.args.hdbscan
+def clust_step_param_num = params.args.hdbscan.size()
+
+println "${clust_step_param_num} scan params num"
+
+def lbp_combinations = createCombinations(lbp_step)
+def umap_combinations = createCombinations(dimred_step)
+def hdbscan_combinations = createCombinations(clust_step)
 
 lbp_combinations.combine(umap_combinations.combine(hdbscan_combinations)).set {all_parameters_combinations}
+
+
 
 process generate_params_combinations_dir {
     debug debug_flag
@@ -106,7 +118,7 @@ process fastlbp {
 
     output:
     path("data")
-    tuple path("data/out/${file(params.lbp.outfile_name).getBaseName()}_flattened.npy"), val(img_id), emit: lbp_result_file_flattened
+    tuple path("data/out/${file(params.constargs.lbp.outfile_name).getBaseName()}_flattened.npy"), val(img_id), emit: lbp_result_file_flattened
 
     script:
     img_id = img_id ? img_id : img.getBaseName()
@@ -116,11 +128,11 @@ process fastlbp {
     run_lbp.py \
         --img_path ${img} \
         --patchsize ${patchsize} \
-        --ncpus ${params.lbp.ncpus} \
-        --outfile_name ${params.lbp.outfile_name} \
+        --ncpus ${params.constargs.lbp.ncpus} \
+        --outfile_name ${params.constargs.lbp.outfile_name} \
         ${mask_path} \
         ${patchmask_path} \
-        --img_name ${params.lbp.img_name}
+        --img_name ${params.constargs.lbp.img_name}
     """
 }
 
@@ -170,10 +182,10 @@ process labels_to_patch_img {
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
-    tuple val(img_id), path(labels_data), path(patchmask)
+    tuple path(patchmask), path(labels_data), val(img_id)
 
     output:
-    tuple val(img_id), path(savefile)
+    tuple path(savefile), val(img_id)
 
     script:
     savefile = "patch_labels.npy"
@@ -185,6 +197,25 @@ process labels_to_patch_img {
     """
 }
 
+process split_params_combinations_str_in_separate_channels {
+    fair true
+
+    input:
+    val(param_str)
+
+    output:
+    val(lbp_params), emit: lbp_params_combs
+    val(dimred_params), emit: dimred_params_combs
+    val(clust_params), emit: clust_params_combs
+
+    script:
+    lbp_params = param_str.subList(0, 2 * lbp_step_param_num)
+    dimred_params = param_str.subList(2 * lbp_step_param_num, 2 * (dimred_step_param_num + lbp_step_param_num))
+    clust_params = param_str.subList(2 * (dimred_step_param_num + lbp_step_param_num), 2 * (dimred_step_param_num + lbp_step_param_num + clust_step_param_num))
+    """
+    """
+}
+
 workflow SingleImage {
     take:
     parameters_set
@@ -192,9 +223,31 @@ workflow SingleImage {
     main:
 
     parameters_set
+        .map { it -> it.flatten().toList() }
+        .set { testik }
+
+    split_params_combinations_str_in_separate_channels(testik)
+
+    split_params_combinations_str_in_separate_channels.out.lbp_params_combs
+        .set { lbp_params_combss }
+    split_params_combinations_str_in_separate_channels.out.dimred_params_combs
+        .set { dimred_params_combss }
+    split_params_combinations_str_in_separate_channels.out.clust_params_combs
+        .set { clust_params_combss }
+
+    lbp_params_combss.view()
+    dimred_params_combss.view()
+    clust_params_combss.view()
+
+    parameters_set
         .flatten()
         .collate(2) // pairs <parameter_name, parameters_value>
         .set { collated_parameters_set_flat }
+
+    // collated_parameters_set_flat.view()
+    // collated_parameters_set_flat.transpose().groupTuple()
+    //     .map { nn -> [nn[0], nn[1].unique()] }
+    //     .set {  }
 
     collated_parameters_set_flat
         .branch { param_def ->
