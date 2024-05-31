@@ -1,32 +1,26 @@
 # --- set img path and savedir --- #
 imgs_dir: '/path/to/images/dir'
-
-# Available options for 'masks' parameter:
-#   - '/path/to/masks/dir': to use path to the dir with masks
-#   - 'auto': to calculate masks using Otsu's method
-#   - '' or don't specify at all to run the pipeline on the whole images
-masks: '/path/to/masks/dir'
-
-
 outdir: '/path/to/outdir'
 
-crop:
-  crop_left: 0.15
-  crop_right: 0.15
-  crop_top: 0.1
-  crop_bottom: 0.1
-lbp:
-  patchsize: 20
-  ncpus: 30
-  outfile_name: 'lbp_result.npy'
-  img_name: 'lbp_result'
-umap:
-  n_components: 20
-  n_neighbors: 30
-  min_dist: 0.0 
-  random_state: 42
-hdbscan:
-  min_samples: 1
-  min_cluster_size: 300
-  cluster_selection_epsilon: 0.0
-  gen_min_span_tree: True
+# --- choose from the following or leave blank to not use the mask --- #
+# masks: '/path/to/mask/or/any/other/annotations'
+# masks: auto
+
+
+# --- specify parameters --- #
+args:
+  lbp:
+    patchsize: 10
+    ncpus: 30
+    outfile_name: 'lbp_result.npy'
+    img_name: 'lbp_result'
+  umap:
+    n_components: 20
+    n_neighbors: 20
+    min_dist: 0.0
+    random_state: 42
+  hdbscan:
+    min_samples: 1
+    min_cluster_size: 300
+    cluster_selection_epsilon: 0.0
+    gen_min_span_tree: True
