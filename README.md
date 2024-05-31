@@ -20,9 +20,3 @@ To run in either **SingleImage** or **MultiImage** mode, choose the correspondin
 ```bash
 nextflow run main.nf -profile conda -params-file templates/single_image.yaml -entry Pipeline
 ```
-
-
-Create parameters file based on one of the templates and run: 
-```bash
-nextflow run main.nf -profile conda -params-file templates/single_image.yaml -entry Pipeline
-```
