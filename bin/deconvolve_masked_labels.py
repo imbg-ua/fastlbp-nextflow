@@ -29,7 +29,7 @@ def labels_to_patch_img(
     labels = np.load(np_labels_path) # dtype = np.int_
     lbp_res_shape = np.load(lbp_output_path).shape
 
-    labels_img = labels.reshape((lbp_res_shape[0], lbp_res_shape[1], -1))
+    labels_img = labels.reshape((lbp_res_shape[0], lbp_res_shape[1]))
     labels_img += increment
 
     np.save(savefile, labels_img)    
