@@ -64,7 +64,7 @@ process hdbscan {
     tuple path(data), val(img_id)
 
     output:
-    path("hdbscan_labels.npy")
+    path("hdbscan_labels.npy"), emit: hdbscan_labels
 
     script:
     """
@@ -77,9 +77,33 @@ process hdbscan {
     """
 }
 
+process create_preview {
+    debug debug_flag
+    publishDir "${params.outdir}/${img_id}", mode: "copy"
+
+    input:
+    tuple path(input_image), path(hdbscan_labels)
+
+    output:
+    path("thumbnail.jpg")
+    path("labels.jpg")
+
+    script:
+    """
+    preview.py generate_img_thumbnail --img_path ${img}
+
+    preview.py generate_labels_preview \
+        --patchsize ${params.lbp.patchsize} \
+        --img_path ${input_image} \
+        --np_labels_path ${hdbscan_labels}
+    """
+
+}
+
 workflow SingleImage {
     fastlbp([params.img_path, params.mask.binmask_path ? file(params.mask.binmask_path) : []])
     umap(fastlbp.out.lbp_result_file_flattened) | hdbscan
+    create_preview(params.img_path, hdbscan.out.hdbscan_labels)
 }
 
 workflow MultiImage {
