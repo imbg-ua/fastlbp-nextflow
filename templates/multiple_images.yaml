@@ -1,18 +1,18 @@
 # --- set img path and savedir --- #
-imgs_dir: '/path/to/images/dir'
-masks_dir: '/path/to/masks/dir'
-outdir: '/path/to/outdir'
+imgs_dir: '/lustre/scratch126/casm/team268im/mk43/data/chase_db1'
+# masks_dir: '/path/to/masks/dir'
+outdir: '/lustre/scratch126/casm/team268im/mk43/fastlbp-proj/lbp-unsupervised-chasedb/out'
 
-crop:
-  crop_left: 0.15
-  crop_right: 0.15
-  crop_top: 0.1
-  crop_bottom: 0.1
+# crop:
+#   crop_left: 0.15
+#   crop_right: 0.15
+#   crop_top: 0.1
+#   crop_bottom: 0.1
 lbp:
   patchsize: 20
   ncpus: 30
-  outfile_name: 'lbp_result.npy'
-  img_name: 'lbp_result'
+  outfile_name: 'lbp_chasedb.npy'
+  img_name: 'lbp_chasedb'
 umap:
   n_components: 20
   n_neighbors: 30
