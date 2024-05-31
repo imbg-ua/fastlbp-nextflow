@@ -5,6 +5,7 @@ import os
 import fire
 import tifffile as tf
 import numpy as np
+import ast
 
 PIL_EXTENSIONS = ('.jpeg', '.jpg', '.png')
 TIFFFILE_EXTENSIONS = ('.tif', '.tiff', '.ndpi')
@@ -27,6 +28,24 @@ def read_img(path: str) -> np.array:
 
     else:
         raise ValueError(f'Image format {os.path.splitext(path)[1]} is not supported')
+
+def convert_to_proper_type(val: str):
+    try:
+        val = ast.literal_eval(val)
+    except ValueError:
+        pass
+    return val
+
+def parse_params_str(params_str: str) -> dict:
+    """
+    Input example: 
+    params_str = [param_1, 10, param_2, 20]
+    """
+
+    params_list = list(map(lambda x: x.strip("[ ]\"'"), str(params_str).split(',')))
+    params_dict = {params_list[i]: convert_to_proper_type(params_list[i + 1]) for i in range(0, len(params_list), 2)}
+
+    return params_dict
 
 
 if __name__ == '__main__':

@@ -3,6 +3,7 @@
 import umap
 import fire
 import numpy as np
+import workflow_utils as ut
 
 def run_umap(
     np_data_path: str, 
@@ -14,6 +15,11 @@ def run_umap(
     np.save(savefile, embeddings)
 
 
+def main(np_data_path: str, params_str: str) -> None:
+    params_dict = ut.parse_params_str(params_str)
+    run_umap(np_data_path=np_data_path, 
+             **params_dict)
+
 if __name__ == '__main__':
-    fire.Fire(run_umap)
+    fire.Fire(main)
     
