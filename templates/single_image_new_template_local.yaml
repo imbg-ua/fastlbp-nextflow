@@ -1,7 +1,7 @@
 # --- set img path and savedir --- #
 img_path: '/nfs/lbp_project/Thymus_all/TA11486161/spatial/test_nextflow_origs/tissue_lowres_image.png'
-outdir: '/lustre/scratch126/casm/team268im/dh24/test_nextflow_fastlbp_process_single_image'
-# mask: '/nfs/lbp_project/Thymus_all/TA11486161/spatial/test_nextflow_annots/tissue_lowres_image_annotation.png'
+outdir: '/lustre/scratch126/casm/team268im/dh24/test_nextflow_fastlbp_process_single_image_OTSU'
+mask: '/nfs/lbp_project/Thymus_all/TA11486161/spatial/test_nextflow_annots/tissue_lowres_image_annotation.png'
 # mask: auto
 
 constargs:
@@ -12,7 +12,7 @@ constargs:
 
 args:
   lbp:
-    patchsize: [50, 100]
+    patchsize: [10, 20]
   umap:
     n_components: 20
     n_neighbors: [20, 30]

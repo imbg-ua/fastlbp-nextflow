@@ -57,12 +57,6 @@ def run_lbp(
         img_mask=img_mask.astype(np.uint8))
 
         lbp_result = np.load(f'data/out/{outfile_name}')
-        
-        # patch_mask = downscale_mask(img_mask, lbp_result.shape[0], lbp_result.shape[1])
-
-        # np.save('patchmask_lbp.npy', patch_mask)
-        # np.save('pixelmask_lbp.npy', img_mask)
- 
         lbp_result_flattened = lbp_result[patch_mask]
         
         np.save(f'data/out/{os.path.splitext(outfile_name)[0]}_flattened.npy', lbp_result_flattened)
@@ -88,7 +82,6 @@ def main(
     save_intermediate_results: bool = True) -> None:
 
     params_dict = ut.parse_params_str(params_str)
-    print(params_dict)
     run_lbp(img_path=img_path, 
             ncpus=ncpus, 
             img_mask=img_mask, 
