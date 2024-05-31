@@ -309,7 +309,6 @@ workflow SingleImage {
             .map { img, annot, img_id, lbp_params_str ->
             tuple(img_id, img, annot, extract_patchsize_from_lbp_params_list(lbp_params_str)) }
             .set { downscale_me }
-
         
         downscale_mask(downscale_me)
 
@@ -344,49 +343,13 @@ workflow SingleImage {
     }
 }
 
-workflow MultiImage {
-    // imgs = files("${params.imgs_dir}/*")
-
-    // if ( !params.masks ) {
-
-    //     log.info("No mask mode")
-
-    //     imgs_and_masks = Channel.fromList(imgs)
-    //         .map {it -> [
-    //             it, [], []
-    //             ]}
-    //     fastlbp(imgs_and_masks)
-    //     umap(fastlbp.out.lbp_result_file_flattened) | hdbscan
-
-    // } else if ( params.masks == "auto" ) {
-
-    //     log.info("Otsu mask mode")
-
-    //     imgs_and_masks = Channel.fromList(imgs)
-    //     get_tissue_mask(imgs_and_masks) | downscale_mask | fastlbp
-    //     umap(fastlbp.out.lbp_result_file_flattened) | hdbscan
-        
-    // } else {
-        
-    //     log.info("Provided mask mode")
-
-    //     imgs_and_masks = Channel.fromList(imgs)
-    //         .map {it -> [
-    //             it,
-    //             file(params.masks) \
-    //             / it.getBaseName() + "_${params.annot_suffix}." + it.getExtension()
-    //             ]}
-        
-    //     downscale_mask(imgs_and_masks) | fastlbp
-    //     umap(fastlbp.out.lbp_result_file_flattened) | hdbscan
-
-    // }
-}
-
 workflow Pipeline {
     if ( params.img_path && !params.imgs_dir )    
         SingleImage(all_parameters_combinations)
-        
-    else
-        MultiImage()
+    else {
+        log.error("""
+        Parameter search is available only in SingleImage mode.
+        Make sure you specified correct image path.
+        """)
+    }
 }
