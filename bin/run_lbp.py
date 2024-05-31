@@ -71,7 +71,8 @@ def run_lbp(
         np.save(f'data/out/{os.path.splitext(outfile_name)[0]}_flattened.npy', lbp_result_flattened)
 
 
-def main(
+# TODO: make these 2 functions a single one
+def main_grid_search(
     img_path: str, 
     params_str: str, 
     ncpus: int = 1, 
@@ -91,6 +92,20 @@ def main(
             save_intermediate_results=save_intermediate_results, 
             **params_dict)
 
+def main(
+    img_path: str,
+    params_str: str,
+    img_mask: str = None,
+    patch_mask: str = None,
+    save_intermediate_results: bool = True) -> None:
+
+    params_dict = ut.parse_params_str(params_str)
+    run_lbp(img_path=img_path,
+            img_mask=img_mask,
+            patch_mask=patch_mask,
+            save_intermediate_results=save_intermediate_results,
+            **params_dict)
+
 if __name__ == '__main__':
-    fire.Fire(main)
+    fire.Fire()
     

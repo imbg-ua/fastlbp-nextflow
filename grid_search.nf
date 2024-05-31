@@ -87,15 +87,15 @@ process get_tissue_mask {
 }
 
 process downscale_mask {
-    tag "${img_id}"
+    tag "${run_id}"
     debug debug_flag
-    publishDir "${params.outdir}/${img_id}", mode: "copy"
+    publishDir "${params.outdir}/${run_id}", mode: "copy"
 
     input:
-    tuple val(img_id), path(img), path(pixelmask), val(patchsize)
+    tuple val(run_id), path(img), path(pixelmask), val(patchsize)
 
     output:
-    tuple val(img_id), path(img), path(pixelmask), path(savefile)
+    tuple val(run_id), path(img), path(pixelmask), path(savefile)
 
     script:
     savefile = "patchmask.npy"
@@ -108,23 +108,23 @@ process downscale_mask {
 }
 
 process fastlbp {
-    tag "${img_id}"
+    tag "${run_id}"
     debug debug_flag
-    publishDir "${params.outdir}/${img_id}", mode: "copy"
+    publishDir "${params.outdir}/${run_id}", mode: "copy"
 
     input:
-    tuple val(img_id), path(img), path(mask), path(patchmask), val(params_str)
+    tuple val(run_id), path(img), path(mask), path(patchmask), val(params_str)
 
     output:
     path("data")
-    tuple val(img_id), path("data/out/${file(params.constargs.lbp.outfile_name).getBaseName()}_flattened.npy"), emit: lbp_result_file_flattened
-    tuple val(img_id), path("data/out/${file(params.constargs.lbp.outfile_name).getBaseName()}.npy"), emit: lbp_result_file_img
+    tuple val(run_id), path("data/out/${file(params.constargs.lbp.outfile_name).getBaseName()}_flattened.npy"), emit: lbp_result_file_flattened
+    tuple val(run_id), path("data/out/${file(params.constargs.lbp.outfile_name).getBaseName()}.npy"), emit: lbp_result_file_img
 
     script:
     mask_path = mask ? "--img_mask ${mask}" : ""
     patchmask_path = patchmask ? "--patch_mask ${patchmask}" : ""
     """
-    run_lbp.py \
+    run_lbp.py main_grid_search \
         --img_path ${img} \
         --params_str "${params_str}" \
         --ncpus ${params.constargs.lbp.ncpus} \
@@ -137,13 +137,13 @@ process fastlbp {
 
 process umap {
     debug debug_flag
-    publishDir "${params.outdir}/${img_id}", mode: "copy"
+    publishDir "${params.outdir}/${run_id}", mode: "copy"
 
     input:
-    tuple val(img_id), path(lbp_result_flattened), val(params_str)
+    tuple val(run_id), path(lbp_result_flattened), val(params_str)
 
     output:
-    tuple val(img_id), path("umap_embeddings.npy")
+    tuple val(run_id), path("umap_embeddings.npy")
 
     script:
     """
@@ -155,13 +155,13 @@ process umap {
 
 process hdbscan {
     debug debug_flag
-    publishDir "${params.outdir}/${img_id}", mode: "copy"
+    publishDir "${params.outdir}/${run_id}", mode: "copy"
 
     input:
-    tuple val(img_id), path(data), val(params_str)
+    tuple val(run_id), path(data), val(params_str)
 
     output:
-    tuple val(img_id), path("hdbscan_labels.npy")
+    tuple val(run_id), path("hdbscan_labels.npy")
 
     script:
     """
@@ -173,13 +173,13 @@ process hdbscan {
 
 process labels_to_patch_img {
     debug debug_flag
-    publishDir "${params.outdir}/${img_id}", mode: "copy"
+    publishDir "${params.outdir}/${run_id}", mode: "copy"
 
     input:
-    tuple val(img_id), path(labels_data), path(patchmask), path(lbp_output)
+    tuple val(run_id), path(labels_data), path(patchmask), path(lbp_output)
 
     output:
-    tuple val(img_id), path(savefile)
+    tuple val(run_id), path(savefile)
 
     script:
     savefile = "patch_labels.npy"
@@ -229,7 +229,7 @@ workflow SingleImage {
         info_log("No mask mode")
 
         lbp_runs
-            .map { hash, params_list -> [hash, params.img_path, [], [], params_list.toString()] }
+            .map { hash, params_list -> [hash, params.img_path, [], [], params_list.toString()] } // TODO: remove toString() ?
             .set { no_mask }
         fastlbp(no_mask)
 
@@ -250,8 +250,8 @@ workflow SingleImage {
         hdbscan.out
             .join(no_mask)
             .join(lbp_runs)
-            .map { img_id, clust_labels, img_path, pixelmask, patchmask, lbp_run_params, lbp_result_img ->
-            tuple(img_id, clust_labels, patchmask, lbp_result_img)}
+            .map { run_id, clust_labels, img_path, pixelmask, patchmask, lbp_run_params, lbp_result_img ->
+            tuple(run_id, clust_labels, patchmask, lbp_result_img)}
             .set { convert_my_labels_to_img }
 
         labels_to_patch_img(convert_my_labels_to_img)
@@ -264,8 +264,8 @@ workflow SingleImage {
 
         get_tissue_mask.out
             .combine(lbp_runs)
-            .map { img, pixelmask, img_id, lbp_params ->
-            tuple(img_id, img, pixelmask, extract_patchsize_from_lbp_params_list(lbp_params))
+            .map { img, pixelmask, run_id, lbp_params ->
+            tuple(run_id, img, pixelmask, extract_patchsize_from_lbp_params_list(lbp_params))
             }
             .set {downscale_me}
 
@@ -293,8 +293,8 @@ workflow SingleImage {
 
         hdbscan.out
             .join(feed_me_into_lbp)
-            .map { img_id, clust_labels, img, pixelmask, patchmask, lbp_params ->
-            tuple(img_id, clust_labels, patchmask) }
+            .map { run_id, clust_labels, img, pixelmask, patchmask, lbp_params ->
+            tuple(run_id, clust_labels, patchmask) }
             .join(lbp_runs)
             .set { convert_my_labels_to_img }
 
@@ -306,8 +306,8 @@ workflow SingleImage {
         
         img_and_mask
             .combine(lbp_runs)
-            .map { img, annot, img_id, lbp_params_str ->
-            tuple(img_id, img, annot, extract_patchsize_from_lbp_params_list(lbp_params_str)) }
+            .map { img, annot, run_id, lbp_params_str ->
+            tuple(run_id, img, annot, extract_patchsize_from_lbp_params_list(lbp_params_str)) }
             .set { downscale_me }
         
         downscale_mask(downscale_me)
@@ -334,8 +334,8 @@ workflow SingleImage {
 
         hdbscan.out
             .join(feed_me_into_lbp)
-            .map { img_id, clust_labels, img, pixelmask, patchmask, lbp_params ->
-            tuple(img_id, clust_labels, patchmask) }
+            .map { run_id, clust_labels, img, pixelmask, patchmask, lbp_params ->
+            tuple(run_id, clust_labels, patchmask) }
             .join(lbp_runs)
             .set { convert_my_labels_to_img }
 
