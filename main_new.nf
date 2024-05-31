@@ -120,6 +120,7 @@ process fastlbp {
     output:
     path("data")
     tuple val(img_id), path("data/out/${file(params.constargs.lbp.outfile_name).getBaseName()}_flattened.npy"), emit: lbp_result_file_flattened
+    tuple val(img_id), path("data/out/${file(params.constargs.lbp.outfile_name).getBaseName()}.npy"), emit: lbp_result_file_img
 
     script:
     mask_path = mask ? "--img_mask ${mask}" : ""
@@ -177,14 +178,14 @@ process labels_to_patch_img {
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
-    tuple val(img_id), path(lbp_output), path(patchmask), path(labels_data)
+    tuple val(img_id), path(labels_data), path(lbp_output), path(patchmask)
 
     output:
     tuple val(img_id), path(savefile)
 
     script:
     savefile = "patch_labels.npy"
-    command = "masked_labels_to_patch_img --np_mask_path ${patchmask}" ? patchmask : \
+    command = patchmask ? "masked_labels_to_patch_img --np_mask_path ${patchmask}" : \
     "labels_to_patch_img --lbp_output_path ${lbp_output}"
     """
     deconvolve_masked_labels.py ${command} \
@@ -193,29 +194,29 @@ process labels_to_patch_img {
     """
 }
 
-process split_params_combinations_str_in_separate_channels {
-    fair true
+// process split_params_combinations_str_in_separate_channels {
+//     fair true
 
-    input:
-    val(param_str)
+//     input:
+//     val(param_str)
 
-    output:
-    val(lbp_params), emit: lbp_params_combs
-    val(dimred_params), emit: dimred_params_combs
-    val(clust_params), emit: clust_params_combs
+//     output:
+//     val(lbp_params), emit: lbp_params_combs
+//     val(dimred_params), emit: dimred_params_combs
+//     val(clust_params), emit: clust_params_combs
 
-    script:
-    // TODO: this is the ugliest thing ever
-    lbp_params = param_str.subList(0, 2 * lbp_step_param_num)
+//     script:
+//     // TODO: this is the ugliest thing ever
+//     lbp_params = param_str.subList(0, 2 * lbp_step_param_num)
 
-    dimred_params = param_str.subList(2 * lbp_step_param_num,
-    2 * (dimred_step_param_num + lbp_step_param_num))
+//     dimred_params = param_str.subList(2 * lbp_step_param_num,
+//     2 * (dimred_step_param_num + lbp_step_param_num))
 
-    clust_params = param_str.subList(2 * (dimred_step_param_num + lbp_step_param_num),
-    2 * (dimred_step_param_num + lbp_step_param_num + clust_step_param_num))
-    """
-    """
-}
+//     clust_params = param_str.subList(2 * (dimred_step_param_num + lbp_step_param_num),
+//     2 * (dimred_step_param_num + lbp_step_param_num + clust_step_param_num))
+//     """
+//     """
+// }
 
 workflow SingleImage {
     take:
@@ -264,6 +265,10 @@ workflow SingleImage {
         fastlbp.out.lbp_result_file_flattened
             .join(dimred_runs)
             .set { feed_me_into_umap }
+
+        fastlbp.out.lbp_result_file_img
+            .set { lbp_runs }
+
         umap(feed_me_into_umap)
 
         umap.out
@@ -271,12 +276,14 @@ workflow SingleImage {
             .set { feed_me_into_hdbscan }
         hdbscan(feed_me_into_hdbscan)
 
-        // hdbscan.out
-        //     .join(no_mask)
-        //     .view()
+        hdbscan.out
+            .join(no_mask)
+            .join(lbp_runs)
+            .map { img_id, clust_labels, img_path, pixelmask, patchmask, lbp_run_params, lbp_result_img ->
+            tuple(img_id, clust_labels, lbp_result_img, patchmask)}
+            .set { convert_my_labels_to_img }
 
-        // labels_to_patch_img()
-
+        labels_to_patch_img(convert_my_labels_to_img)
     }
 
     // } else if ( params.mask == "auto" ) {
