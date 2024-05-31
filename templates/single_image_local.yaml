@@ -2,26 +2,24 @@
 img_path: '/nfs/lbp_project/Thymus_all/TA11486161/spatial/test_nextflow_origs/tissue_lowres_image.png'
 outdir: '/lustre/scratch126/casm/team268im/dh24/test_nextflow_fastlbp_process_single_image'
 
-
-crop:
-  crop_left: 0.15
-  crop_right: 0.15
-  crop_top: 0.1
-  crop_bottom: 0.1
-# mask: '/nfs/lbp_project/Thymus_all/TA11486161/spatial/test_nextflow_annots/tissue_lowres_image_annotation.png'
+# --- choose from the following or leave blank to not use the mask --- #
+mask: '/nfs/lbp_project/Thymus_all/TA11486161/spatial/test_nextflow_annots/tissue_lowres_image_annotation.png'
 # mask: auto
-lbp:
-  patchsize: [50, 100]
-  ncpus: 30
-  outfile_name: 'lbp_result.npy'
-  img_name: 'lbp_result'
-umap:
-  n_components: 20
-  n_neighbors: [20, 30]
-  min_dist: 0.0
-  random_state: 42
-hdbscan:
-  min_samples: 1
-  min_cluster_size: [300, 500]
-  cluster_selection_epsilon: 0.0
-  gen_min_span_tree: True
+
+# --- specify parameters to test --- #
+args:
+  lbp:
+    patchsize: 10
+    ncpus: 30
+    outfile_name: 'lbp_result.npy'
+    img_name: 'lbp_result'
+  umap:
+    n_components: 20
+    n_neighbors: 20
+    min_dist: 0.0
+    random_state: 42
+  hdbscan:
+    min_samples: 1
+    min_cluster_size: 300
+    cluster_selection_epsilon: 0.0
+    gen_min_span_tree: True
