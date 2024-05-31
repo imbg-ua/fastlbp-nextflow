@@ -5,6 +5,15 @@ nextflow.enable.dsl = 2
 debug_flag = true
 params.annot_suffix = "annotation"
 
+def info_log(msg) {
+    // let's make it yellow on a black bg
+    log.info("\u001B[93;40;1m" + msg + "\u001B[0m")
+}
+
+def extract_patchsize_from_lbp_params_list(lbp_params_list) {
+    def res = lbp_params_list.find { it[0] == "patchsize" }
+    res[1]
+}
 
 def createCombinations(method_params) {
     def channels = method_params.collect { key, values -> values instanceof List ? \
@@ -24,33 +33,23 @@ def params_args_list = params.args.collect { k, v -> [k, v] }
 def lbp_step = params.args.lbp
 def lbp_step_param_num = params.args.lbp.size()
 lbp_params_names = params.args.lbp.collect { k, v -> k }
-println "${lbp_params_names} HELLLOOO"
-
-println "${lbp_step_param_num} lbp params num"
 
 def dimred_step = params.args.umap
 def dimred_step_param_num = params.args.umap.size()
 dimred_params_names = params.args.umap.collect { k, v -> k }
-println "${dimred_params_names} HELLLOvccccccOO"
-
-println "${dimred_step_param_num} umap params num"
 
 def clust_step = params.args.hdbscan
 def clust_step_param_num = params.args.hdbscan.size()
 clust_params_names = params.args.hdbscan.collect { k, v -> k }
-println "${clust_params_names} HELLLOOsdasdasdO"
-
-println "${clust_step_param_num} scan params num"
 
 def lbp_combinations = createCombinations(lbp_step)
 def umap_combinations = createCombinations(dimred_step)
 def hdbscan_combinations = createCombinations(clust_step)
 
-hdbscan_combinations.view()
-
 lbp_combinations.combine(umap_combinations.combine(hdbscan_combinations)).set {all_parameters_combinations}
 
 process generate_params_combinations_dir {
+    tag "setup"
     debug debug_flag
     publishDir "${params.outdir}", mode: "copy"
 
@@ -69,17 +68,16 @@ process generate_params_combinations_dir {
     """
 }
 
-
 process get_tissue_mask {
-    tag "${img_id}"
+    tag "preprocessing"
     debug debug_flag
-    publishDir "${params.outdir}/${img_id}", mode: "copy"
+    publishDir "${params.outdir}", mode: "copy"
 
     input:
-    tuple val(img_id), path(img)
+    tuple path(img)
 
     output:
-    tuple val(img_id), path(img), path('pixelmask.npy')
+    tuple path(img), path('pixelmask.npy')
 
     script:
     """
@@ -178,7 +176,7 @@ process labels_to_patch_img {
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
-    tuple val(img_id), path(labels_data), path(lbp_output), path(patchmask)
+    tuple val(img_id), path(labels_data), path(patchmask), path(lbp_output)
 
     output:
     tuple val(img_id), path(savefile)
@@ -194,50 +192,23 @@ process labels_to_patch_img {
     """
 }
 
-// process split_params_combinations_str_in_separate_channels {
-//     fair true
-
-//     input:
-//     val(param_str)
-
-//     output:
-//     val(lbp_params), emit: lbp_params_combs
-//     val(dimred_params), emit: dimred_params_combs
-//     val(clust_params), emit: clust_params_combs
-
-//     script:
-//     // TODO: this is the ugliest thing ever
-//     lbp_params = param_str.subList(0, 2 * lbp_step_param_num)
-
-//     dimred_params = param_str.subList(2 * lbp_step_param_num,
-//     2 * (dimred_step_param_num + lbp_step_param_num))
-
-//     clust_params = param_str.subList(2 * (dimred_step_param_num + lbp_step_param_num),
-//     2 * (dimred_step_param_num + lbp_step_param_num + clust_step_param_num))
-//     """
-//     """
-// }
-
 workflow SingleImage {
     take:
     parameters_set
 
     main:
-
-    // parameters_set.view()
-
     // [string, hash] is the correct order
     parameters_set
         .map { [it, it.flatten().collect().join('_').toString(),  it.flatten().collect().join('_').toString().md5()] }
-        .tap {testik}
+        .tap {hash_and_str}
         .map { [it[2], it[0]] }
         .set { hash_and_comb }
 
-    testik
+    hash_and_str
         .map { [it[1], it[2]] }
         .toList().set { combinations_to_save }
-    // generate tsv file mappign hash to parameter combination
 
+    // generate tsv file mappign hash to parameter combination
     generate_params_combinations_dir(combinations_to_save)
 
     hash_and_comb.transpose().transpose().collate(2)
@@ -255,7 +226,7 @@ workflow SingleImage {
 
     if ( !params.mask ) {
 
-        log.info("No mask mode")
+        info_log("No mask mode")
 
         lbp_runs
             .map { hash, params_list -> [hash, params.img_path, [], [], params_list.toString()] }
@@ -280,54 +251,97 @@ workflow SingleImage {
             .join(no_mask)
             .join(lbp_runs)
             .map { img_id, clust_labels, img_path, pixelmask, patchmask, lbp_run_params, lbp_result_img ->
-            tuple(img_id, clust_labels, lbp_result_img, patchmask)}
+            tuple(img_id, clust_labels, patchmask, lbp_result_img)}
+            .set { convert_my_labels_to_img }
+
+        labels_to_patch_img(convert_my_labels_to_img)
+    } else if ( params.mask == "auto" ) {
+
+        info_log("Otsu mask mode")
+
+        img = Channel.of([params.img_path])
+        get_tissue_mask(img)
+
+        get_tissue_mask.out
+            .combine(lbp_runs)
+            .map { img, pixelmask, img_id, lbp_params ->
+            tuple(img_id, img, pixelmask, extract_patchsize_from_lbp_params_list(lbp_params))
+            }
+            .set {downscale_me}
+
+        downscale_mask(downscale_me)
+
+        downscale_mask.out
+            .join(lbp_runs)
+            .set { feed_me_into_lbp }
+
+        fastlbp(feed_me_into_lbp)
+
+        fastlbp.out.lbp_result_file_flattened
+            .join(dimred_runs)
+            .set { feed_me_into_umap }
+
+        fastlbp.out.lbp_result_file_img
+            .set { lbp_runs }
+
+        umap(feed_me_into_umap)
+
+        umap.out
+            .join(clust_runs)
+            .set { feed_me_into_hdbscan }
+        hdbscan(feed_me_into_hdbscan)
+
+        hdbscan.out
+            .join(feed_me_into_lbp)
+            .map { img_id, clust_labels, img, pixelmask, patchmask, lbp_params ->
+            tuple(img_id, clust_labels, patchmask) }
+            .join(lbp_runs)
+            .set { convert_my_labels_to_img }
+
+        labels_to_patch_img(convert_my_labels_to_img)
+    } else {
+
+        info_log("Provided mask mode")
+        img_and_mask = Channel.of([params.img_path, file(params.mask)])
+        
+        img_and_mask
+            .combine(lbp_runs)
+            .map { img, annot, img_id, lbp_params_str ->
+            tuple(img_id, img, annot, extract_patchsize_from_lbp_params_list(lbp_params_str)) }
+            .set { downscale_me }
+
+        
+        downscale_mask(downscale_me)
+
+        downscale_mask.out
+            .join(lbp_runs)
+            .set { feed_me_into_lbp }
+
+        fastlbp(feed_me_into_lbp)
+
+        fastlbp.out.lbp_result_file_flattened
+            .join(dimred_runs)
+            .set { feed_me_into_umap }
+
+        fastlbp.out.lbp_result_file_img
+            .set { lbp_runs }
+
+        umap(feed_me_into_umap)
+
+        umap.out
+            .join(clust_runs)
+            .set { feed_me_into_hdbscan }
+        hdbscan(feed_me_into_hdbscan)
+
+        hdbscan.out
+            .join(feed_me_into_lbp)
+            .map { img_id, clust_labels, img, pixelmask, patchmask, lbp_params ->
+            tuple(img_id, clust_labels, patchmask) }
+            .join(lbp_runs)
             .set { convert_my_labels_to_img }
 
         labels_to_patch_img(convert_my_labels_to_img)
     }
-
-    // } else if ( params.mask == "auto" ) {
-
-    //     log.info("Otsu mask mode")
-
-    //     img = Channel.of([params.img_path])
-    //     get_tissue_mask(img) | downscale_mask
-
-    //     downscale_mask.out
-    //         .map { img_path, pixelmask_path, patchmask_path ->
-    //             [
-    //                 patchmask_path, 
-    //                 img_path.getBaseName()
-    //             ]
-    //          }
-    //         .set { img_id_and_mask_ch }
-
-    //     fastlbp(downscale_mask.out)
-    //     umap(fastlbp.out.lbp_result_file_flattened) | hdbscan
-        
-    //     img_id_and_mask_ch
-    //         .join(hdbscan.out, by:1)
-    //         .map {
-    //             imd_id, patchmask_path, clustering_labels_path -> 
-    //                 [
-    //                     patchmask_path, 
-    //                     clustering_labels_path, 
-    //                     imd_id
-    //                 ]
-    //         } 
-    //         .set { deconvolve_ch }
-
-    //     labels_to_patch_img(deconvolve_ch)
-        
-    // } else {
-        
-    //     log.info("Provided mask mode")
-
-    //     img_and_mask = Channel.of([params.img_path, file(params.mask)])
-    //     downscale_mask(img_and_mask) | fastlbp
-    //     umap(fastlbp.out.lbp_result_file_flattened) | hdbscan
-
-    // }
 }
 
 workflow MultiImage {

@@ -17,9 +17,6 @@ def run_umap(
 
 def main(np_data_path: str, params_str: str) -> None:
     params_dict = ut.parse_params_str(params_str)
-    # This is the stupidest unimaginable crap 
-    # params_dict = {k: float(params_dict[v]) if '.' in params_dict[v] else int(params_dict[v]) for k in params_dict}
-    print(params_dict)
     run_umap(np_data_path=np_data_path, 
              **params_dict)
 
