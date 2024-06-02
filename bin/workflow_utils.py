@@ -6,6 +6,7 @@ import fire
 import tifffile as tf
 import numpy as np
 import ast
+import re
 
 PIL_EXTENSIONS = ('.jpeg', '.jpg', '.png')
 TIFFFILE_EXTENSIONS = ('.tif', '.tiff', '.ndpi')
@@ -36,14 +37,30 @@ def convert_to_proper_type(val: str):
         pass
     return val
 
+# TODO: make this better
 def parse_params_str(params_str: str) -> dict:
     """
     Input example: 
     params_str = [param_1, 10, param_2, 20]
     """
+    params_str = str(params_str)
 
-    params_list = list(map(lambda x: x.strip("[ ]\"'"), str(params_str).split(',')))
-    params_dict = {params_list[i]: convert_to_proper_type(params_list[i + 1]) for i in range(0, len(params_list), 2)}
+    words_without_quotes = r"(?<!')\b[a-zA-Z_](\w*\.?)*\w*\b(?!')"
+    params_str = re.sub(words_without_quotes, r"'\g<0>'", params_str) # single quote every string
+
+    bool_regex = r"'\b(true|false)\b'"
+
+    def bool_to_capital(match):
+        word = match.group(1)
+        if word.lower() == 'true':
+            return 'True'
+        elif word.lower() == 'false':
+            return 'False'
+
+    params_str = re.sub(bool_regex, bool_to_capital, params_str, flags=re.IGNORECASE)
+
+    params_list = convert_to_proper_type(params_str)
+    params_dict = {param_name: param_val for param_name, param_val in params_list}
 
     return params_dict
 

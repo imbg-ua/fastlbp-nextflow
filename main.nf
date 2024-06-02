@@ -15,14 +15,11 @@ def extract_patchsize_from_lbp_params_list(lbp_params_list) {
     res[1]
 }
 
-
 def params_args_list = params.args.collect { k, v -> [k, v] }
 
 def lbp_params = params.args.lbp.collect { k, v -> [k, v] }
 def umap_params = params.args.umap.collect { k, v -> [k, v] }
 def hdbscan_params = params.args.hdbscan.collect { k, v -> [k, v] }
-
-println "${hdbscan_params}"
 
 process get_tissue_mask {
     tag "preprocessing"

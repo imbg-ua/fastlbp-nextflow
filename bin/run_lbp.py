@@ -33,6 +33,8 @@ def downscale_mask(pixelmask: np.array, np_shape_0, np_shape_1) -> np.array:
 def run_lbp(
     img_path: str,
     patchsize: int = 100, 
+    radii: list[int] | None = None,
+    npoints: list[int] | None = None,
     ncpus: int = 1, 
     img_mask: str = None,
     patch_mask: str = None, 
@@ -40,19 +42,19 @@ def run_lbp(
     img_name: str = 'lbp_result', 
     save_intermediate_results: bool = True) -> None:
 
-    # TODO will fire automatically cast str to int? upd: it won't
-    # patchsize = int(patchsize)
+    if radii is None:
+        radii = get_radii_list(patchsize)
+
+    if npoints is None:
+        npoints = [fastlbp.get_p_for_r(r) for r in radii]
 
     img = ut.read_img(img_path)
-
-    radii = get_radii_list(patchsize)
-    npoints_list = [fastlbp.get_p_for_r(r) for r in radii]
 
     if img_mask:
         img_mask = ut.read_img(img_mask).astype(np.bool_)
         patch_mask = ut.read_img(patch_mask).astype(np.bool_)
 
-        fastlbp.run_fastlbp(img, radii, npoints_list, patchsize, ncpus, 
+        fastlbp.run_fastlbp(img, radii, npoints, patchsize, ncpus, 
         outfile_name=outfile_name, img_name=img_name, save_intermediate_results=save_intermediate_results,
         img_mask=img_mask.astype(np.uint8))
 
@@ -62,7 +64,7 @@ def run_lbp(
         np.save(f'data/out/{os.path.splitext(outfile_name)[0]}_flattened.npy', lbp_result_flattened)
 
     else:
-        fastlbp.run_fastlbp(img, radii, npoints_list, patchsize, ncpus,
+        fastlbp.run_fastlbp(img, radii, npoints, patchsize, ncpus,
         outfile_name=outfile_name, img_name=img_name, save_intermediate_results=save_intermediate_results)
 
         # TODO: refactor this
