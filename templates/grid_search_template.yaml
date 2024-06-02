@@ -16,7 +16,12 @@ constargs:
 # --- specify parameters to test --- #
 args:
   lbp:
-    patchsize: [10, 20]
+    patchsize: 10
+    # to pass list as a single parameter, enclose it in additional brackets 
+    # so that it is not confused with a set of different values
+    radii: [[1, 5]]
+    # you can still pass multiple lists to try in your workflow though
+    npoints: [[6, 12], [8, 13]]
   umap:
     n_components: 20
     n_neighbors: [20, 30]

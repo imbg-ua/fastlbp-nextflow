@@ -45,7 +45,8 @@ def parse_params_str(params_str: str) -> dict:
     """
     params_str = str(params_str)
 
-    words_without_quotes = r"(?<!')\b[a-zA-Z_](\w*\.?)*\w*\b(?!')"
+    # TODO: this is not versatile, need to cover all possible options for str params
+    words_without_quotes = r"(?<!')\b[a-zA-Z_](\w*-*\.?)*\w*\b(?!')"
     params_str = re.sub(words_without_quotes, r"'\g<0>'", params_str) # single quote every string
 
     bool_regex = r"'\b(true|false)\b'"

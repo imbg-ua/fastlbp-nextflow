@@ -23,13 +23,6 @@ def get_radii_list(patchsize: int, a: float=1.499, b: float=1.327) -> list:
             break
     return radii
 
-# TODO: move to separate module + separate process
-def downscale_mask(pixelmask: np.array, np_shape_0, np_shape_1) -> np.array:
-    # TODO: change downscaling method
-    pil = Image.fromarray(pixelmask)
-    pil = pil.resize((np_shape_1, np_shape_0)) # PIL dimensions are swapped as compared to np array
-    return np.array(pil, dtype=np.bool_)
-
 def run_lbp(
     img_path: str,
     patchsize: int = 100, 

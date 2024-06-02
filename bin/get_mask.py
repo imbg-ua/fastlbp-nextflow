@@ -36,7 +36,8 @@ def get_otsu_mask(grayscale_img_arr: np.array) -> np.array:
     otsu_mask = grayscale_img_arr > otsu_threshold
     return otsu_mask.astype(np.bool_)
 
-
+# TODO: combine these functions in one?
+# TODO: add downscaling method option
 def downscale(
     img_path: str, 
     height: int, 
@@ -51,6 +52,7 @@ def downscale(
 
     np.save(savefile, img)
 
+# TODO: add downscaling method option
 def downscale_using_patchsize(
     img_path: str, 
     patchsize: int,

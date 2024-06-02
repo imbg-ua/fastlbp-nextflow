@@ -22,7 +22,7 @@ def umap_params = params.args.umap.collect { k, v -> [k, v] }
 def hdbscan_params = params.args.hdbscan.collect { k, v -> [k, v] }
 
 process get_tissue_mask {
-    tag "preprocessing"
+    tag "${img_id}"
     debug debug_flag
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 

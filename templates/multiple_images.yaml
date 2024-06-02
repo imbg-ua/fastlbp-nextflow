@@ -11,8 +11,8 @@ outdir: '/path/to/outdir'
 args:
   lbp:
     patchsize: 10
-    radii: [1, 5]
-    npoints: [6, 12]
+    radii: [1, 5] # don't specify to automatically calculate radii according to the default scheme
+    npoints: [6, 12] # don't specify to automatically calculate number of points for each radius
     ncpus: 30
     outfile_name: 'lbp_result.npy'
     img_name: 'lbp_result'

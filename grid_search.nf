@@ -69,7 +69,7 @@ process generate_params_combinations_dir {
 }
 
 process get_tissue_mask {
-    tag "preprocessing"
+    tag "preprocessing ${img.getBaseName()}"
     debug debug_flag
     publishDir "${params.outdir}", mode: "copy"
 
@@ -136,6 +136,7 @@ process fastlbp {
 }
 
 process umap {
+    tag "${run_id}"
     debug debug_flag
     publishDir "${params.outdir}/${run_id}", mode: "copy"
 
@@ -154,6 +155,7 @@ process umap {
 }
 
 process hdbscan {
+    tag "${run_id}"
     debug debug_flag
     publishDir "${params.outdir}/${run_id}", mode: "copy"
 
@@ -172,6 +174,7 @@ process hdbscan {
 }
 
 process labels_to_patch_img {
+    tag "${run_id}"
     debug debug_flag
     publishDir "${params.outdir}/${run_id}", mode: "copy"
 
@@ -349,7 +352,7 @@ workflow Pipeline {
     else {
         log.error("""
         Parameter search is available only in SingleImage mode.
-        Make sure you specified correct image path.
+        Make sure you provided correct path to the image.
         """)
     }
 }
