@@ -86,6 +86,24 @@ process get_tissue_mask {
     """
 }
 
+// process convert_to_binmask {
+//     tag "${run_id}"
+//     debug debug_flag
+//     publishDir "${params.outdir}/${run_id}", mode: "copy"
+
+//     input:
+//     tuple val(run_id), path(pixelmask)
+
+//     output:
+//     tuple path(pixelmask), path('pixelmask.npy')
+
+//     script:
+//     """
+//     get_mask.py convert_to_binmask \
+//         --annot_path ${pixelmask} \
+//     """
+// }
+
 process downscale_mask {
     tag "${run_id}"
     debug debug_flag

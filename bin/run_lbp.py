@@ -23,6 +23,10 @@ def get_radii_list(patchsize: int, a: float=1.499, b: float=1.327) -> list:
             break
     return radii
 
+# # TODO: move to get_mask.py, maybe even as a pipeline step
+# def convert_annot_to_binmask(annot: np.array) -> np.array:
+#     pass
+
 def run_lbp(
     img_path: str,
     patchsize: int = 100, 

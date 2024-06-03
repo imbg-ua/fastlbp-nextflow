@@ -8,6 +8,7 @@ from skimage import filters
 import workflow_utils as ut
 from PIL import Image
 
+Image.MAX_IMAGE_PIXELS = None
 
 def img_arr_to_grayscale(img_arr: np.array) -> np.array:
     return np.dot(img_arr[..., :3], np.array([0.299, 0.587, 0.114])).astype(np.uint8)

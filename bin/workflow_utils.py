@@ -8,6 +8,8 @@ import numpy as np
 import ast
 import re
 
+Image.MAX_IMAGE_PIXELS = None
+
 PIL_EXTENSIONS = ('.jpeg', '.jpg', '.png')
 TIFFFILE_EXTENSIONS = ('.tif', '.tiff', '.ndpi')
 NUMPY_EXTENSIONS = ('.npy')
