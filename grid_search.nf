@@ -17,8 +17,141 @@ def extract_patchsize_from_lbp_params_list(lbp_params_list) {
 }
 
 def createCombinations(method_params) {
+    def method_params_num = method_params.size()
     def channels = method_params.collect { key, values -> values instanceof List ? \
     Channel.of([key, values]).transpose() : Channel.of([key, values])} // Channel.from()
+
+    // println "$method_params DEBUG"
+    // def channels_test = method_params.findAll { it.value.containsKey("values") } // Channel.from()
+    // def no_channels_test = method_params.findAll { !it.value.containsKey("values") } // Channel.from()
+    def channels_test = method_params.findAll { it.value instanceof Map } // Channel.from()
+    def no_channels_test = method_params.findAll { !(it.value instanceof Map) } // Channel.from()
+
+    // def testest_supertest = method_params.collect { key, values -> values instanceof Map ? \
+    // tuple("parameter": key, "values": values.values, "bind_to": values.bind_to) : tuple("parameter": key, "values": values, "bind_to": key) }
+
+
+    def testest_supertest = method_params.collect { key, values -> values instanceof Map ? \
+    tuple(key, values.values, values.bind_to) : tuple(key, values, key) }
+
+    def testest_superttest_ch = Channel.fromList(testest_supertest)
+
+    // testest_superttest_ch
+    //     .map { param, vals, bind_to ->
+    //     bind_to }
+    //     .unique()
+    //     .set { unique_set_of_params }
+
+    // def unique_params = unique_set_of_params.toList()
+
+    testest_superttest_ch
+        .groupTuple(by:2)
+        .map { params_l, values_l, join_key ->
+        [params_l, values_l].transpose() }
+        .set { combinations_entities }
+
+    combinations_entities
+        .map { it ->
+        
+        def transformParams = { data ->
+            def output = data.collectEntries { iit -> [(iit[0]): iit[1]] }
+            def res = []
+            output.values()[0].eachWithIndex {_, idx ->
+                def combined_res = []
+                output.each { kk, vv ->
+                    combined_res << kk
+                    if (vv instanceof List)
+                        combined_res << vv[idx]
+                    else
+                        combined_res << vv
+                }
+                res << combined_res
+            }
+
+            return res
+        }
+        return transformParams(it) 
+        }
+        .set { entities_grouped }
+
+    flatten_in_my_way = { my_list ->
+        def flatList = []
+        my_list.each { itemm ->
+            itemm.each { otem -> otem.each {totem -> flatList.add(totem) } }
+        }
+        return flatList
+    }
+    // entities_grouped.view()
+    entities_grouped
+        .map { kk -> [kk] }
+        .collect()
+        .combinations()
+        .map { ll -> flatten_in_my_way(ll) }
+        .set { all_combs_flat }
+
+    all_combs_flat.flatMap{ kkk -> kkk }.collate(method_params_num * 2)
+        .map { aboba -> aboba.collate(2) }
+        .set { all_combs_final }
+
+    // all_combs_final.view()
+
+    return all_combs_final
+
+
+
+    // entities_grouped.flatMap { lists -> lists }.view()
+    // entities_grouped.collect().combinations().view()
+    // entities_grouped.flatten().view()
+    // println(mmmeega_list.toString())
+    // def entities_grouped_ch_ch = entities_grouped_ch.collect { ww -> Channel.of(ww) }
+
+
+    // entities_grouped_ch_ch[0].view()
+
+    
+    // def first_entity = entities_grouped_ch.head()
+    // def other_entities = entities_grouped_ch.tail()
+
+    // other_entities.view()
+
+    // def entities_grouped_ch_ch = entities_grouped_ch.collect { ww -> Channel.of([ww]) }
+
+    // entities_grouped_ch_ch.view()
+
+    // other_entities
+    //     .map { its -> first_entity = first_entity.combine(its) }
+    
+    // first_entity.view()
+
+        // .view()
+    // def combinations_entities_list = combinations_entities.toList()
+
+    // def new_nomap = no_channels_test
+
+    // def new_map = [:]
+
+    // channels_test.each { key, value -> 
+    //     new_map["${value.bind_to}_${key}"] = tuple(["${value.bind_to}", method_params["${value.bind_to}"], "${key}", value.values])
+    //     new_nomap = new_nomap.findAll { it.key != value.bind_to }
+    // }
+
+    // def new_map_combined_entries = new_map.collect { key, values -> tuple(values) }
+
+    // def combined_entries_ch = Channel.fromList(new_map_combined_entries)
+
+    // combined_entries_ch.view()
+
+    // println "${new_map_combined_entries} DEBUG ALL PARAMS"
+    // println "${new_nomap} DEBUG ALL PARAMS NOMAP"
+    // println "$channels_test DEBUG MAPS"
+    // println "$no_channels_test DEBUG NO MAPS"
+
+    // channels_test[0].view()
+    //     // .map { k, v ->
+    //     // [k: v] }
+    //     // .view()
+
+
     def combinedChannel = channels[0]
     combinedChannel = combinedChannel.map { [it] }
 
@@ -26,6 +159,7 @@ def createCombinations(method_params) {
     channels.tail().each {
         combinedChannel = combinedChannel.combine(it.map { itit -> [itit] })
     }
+    // combinedChannel.view()
     combinedChannel
 }
 
