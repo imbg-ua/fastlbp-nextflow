@@ -3,6 +3,11 @@
 nextflow.enable.dsl = 2
 
 debug_flag = true
+
+if ( !nextflow.version.matches(">=24.04") ) {
+    error "The workflow requires Nextflow version 24.04 or greater, your current version is ${nextflow.version}"
+}
+
 params.annot_suffix = "annotation"
 
 def info_log(msg) {
