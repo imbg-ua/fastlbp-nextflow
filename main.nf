@@ -148,7 +148,7 @@ process labels_to_patch_img {
     """
 }
 
-// TODO: refactor dedundant code
+// TODO: refactor redundant code
 workflow SingleImage {
 
     if ( !params.mask ) {
