@@ -1,0 +1,29 @@
+# --- set img path and savedir --- #
+
+# contains 2 columns: <image\tmask>, mask can be 
+# 1. /path/to/annotations to use as a mask
+# 2. "auto" (without quotes) to calculate mask using Otsu's method 
+# 3. *leave blank* to run without a mask
+imgs_and_masks_tsv: '/path/to/templates/multi_image.tsv' 
+
+outdir: '/path/to/outdir'
+
+# --- specify parameters --- #
+args:
+  lbp:
+    patchsize: 10
+    radii: [1, 5] # don't specify to automatically calculate radii according to the default scheme
+    npoints: [6, 12] # don't specify to automatically calculate number of points for each radius
+    ncpus: 30
+    outfile_name: 'lbp_result.npy'
+    img_name: 'lbp_result'
+  umap:
+    n_components: 20
+    n_neighbors: 20
+    min_dist: 0.0
+    random_state: 42
+  hdbscan:
+    min_samples: 1
+    min_cluster_size: 300
+    cluster_selection_epsilon: 0.0
+    gen_min_span_tree: True

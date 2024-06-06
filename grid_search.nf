@@ -20,18 +20,17 @@ def createCombinations(method_params) {
     // total number of parameters for the method
     def method_params_num = method_params.size()
 
-    def testest_supertest = method_params.collect { key, values -> values instanceof Map ? \
+    def collected_params_list = method_params.collect { key, values -> values instanceof Map ? \
     tuple(key, values.values, values.bind_to) : tuple(key, values, key) }
 
-    def testest_superttest_ch = Channel.fromList(testest_supertest)
+    def collected_params = Channel.fromList(collected_params_list)
 
-    testest_superttest_ch
+    def combinations_entities = collected_params
         .groupTuple(by:2)
         .map { params_l, values_l, join_key ->
         [params_l, values_l].transpose() }
-        .set { combinations_entities }
 
-    combinations_entities
+    def entities_grouped = combinations_entities
         .map { it ->
         
         def transformParams = { data ->
@@ -53,7 +52,6 @@ def createCombinations(method_params) {
         }
         return transformParams(it) 
         }
-        .set { entities_grouped }
 
     // function
     flatten_in_my_way = { my_list ->
@@ -65,38 +63,17 @@ def createCombinations(method_params) {
     }
 
 
-    entities_grouped
+    def all_combs_flat = entities_grouped
         .map { kk -> [kk] }
         .collect()
         .combinations()
         .map { ll -> flatten_in_my_way(ll) }
-        .set { all_combs_flat }
 
-    all_combs_flat.flatMap{ kkk -> kkk }.collate(method_params_num * 2)
+    def all_combs_final = all_combs_flat.flatMap{ kkk -> kkk }.collate(method_params_num * 2)
         .map { aboba -> aboba.collate(2) }
-        .set { all_combs_final }
 
     return all_combs_final
 }
-
-def params_args_list = params.args.collect { k, v -> [k, v] }
-
-def lbp_step = params.args.lbp
-def lbp_step_param_num = params.args.lbp.size()
-lbp_params_names = params.args.lbp.collect { k, v -> k }
-
-def dimred_step = params.args.umap
-def dimred_step_param_num = params.args.umap.size()
-dimred_params_names = params.args.umap.collect { k, v -> k }
-
-def clust_step = params.args.hdbscan
-def clust_step_param_num = params.args.hdbscan.size()
-clust_params_names = params.args.hdbscan.collect { k, v -> k }
-
-def lbp_combinations = createCombinations(lbp_step)
-def umap_combinations = createCombinations(dimred_step)
-def hdbscan_combinations = createCombinations(clust_step)
-
 
 process get_tissue_mask {
     tag "preprocessing"
@@ -112,10 +89,11 @@ process get_tissue_mask {
     script:
     """
     get_mask.py get_mask \
-        --img_path ${img} \
+        --img_path ${img}
     """
 }
 
+// TODO: convert any annotations to a binary mask
 // process convert_to_binmask {
 //     tag "${run_id}"
 //     debug debug_flag
@@ -240,6 +218,43 @@ process labels_to_patch_img {
 
 workflow SingleImage {
 
+    // TODO: find a more concise way to do this
+
+    // check if params for each step are given explicitly or as a path to a tsv file
+    if ( params.args_tsv.lbp ) {
+        def tsv_lbp_args = Channel.fromPath(params.args_tsv.lbp)
+        tsv_lbp_args
+            .splitCsv(header:true, sep:'\t')
+            .map { row -> row.collect { param_k, param_v -> tuple(param_k, param_v) } }
+            .set { lbp_combinations }
+    } else {
+        def lbp_step = params.args.lbp
+        lbp_combinations = createCombinations(lbp_step)
+    }
+    
+    if ( params.args_tsv.umap ) {
+        def tsv_umap_args = Channel.fromPath(params.args_tsv.umap)
+        tsv_umap_args
+            .splitCsv(header:true, sep:'\t')
+            .map { row -> row.collect { param_k, param_v -> tuple(param_k, param_v) } }
+            .set { umap_combinations }
+    } else {
+        def umap_step = params.args.umap
+        umap_combinations = createCombinations(umap_step)
+    }
+
+    if ( params.args_tsv.hdbscan ) {
+        def tsv_hdbscan_args = Channel.fromPath(params.args_tsv.hdbscan)
+        tsv_hdbscan_args
+            .splitCsv(header:true, sep:'\t')
+            .map { row -> row.collect { param_k, param_v -> tuple(param_k, param_v) } }
+            .set { hdbscan_combinations }
+    } else {
+        def hdbscan_step = params.args.hdbscan
+        hdbscan_combinations = createCombinations(hdbscan_step)
+    }
+
+    // generate output dir names for each combination of parameters
     lbp_combinations
         .map { it -> 
         tuple("${params.outdir}/${it.flatten().collect().join('_').toString()}", it) }
