@@ -1,4 +1,4 @@
-# Nextlow pipeline for LBP-based image segmentation
+# Nextflow pipeline for LBP-based image segmentation
 
 ## Key points
 The pipeline supports the following modes:
