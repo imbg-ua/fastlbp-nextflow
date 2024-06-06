@@ -1,0 +1,34 @@
+# --- set img path and savedir --- #
+img_path: '/path/to/image'
+outdir: '/path/to/outdir'
+
+# --- choose from the following or leave blank to not use the mask --- #
+# mask: '/path/to/mask/or/any/other/annotations'
+# mask: auto
+
+# --- select number of threads and output file names for fastLBP --- #
+constargs:
+  lbp:
+    ncpus: 30
+    outfile_name: 'lbp_result.npy'
+    img_name: 'lbp_result'
+
+
+# --- read parameters combinations from a tsv file --- #
+# a separate file must be used for each step of the pipeline
+args_tsv:
+  lbp: '/path/to/lbp_params.tsv'
+
+# --- specify parameters to test --- #
+args:
+  umap:
+    n_components: 20
+    n_neighbors: [20, 30]
+    min_dist: 0.0
+    random_state: 42
+  hdbscan:
+    min_samples: 1
+    min_cluster_size: [300, 500]
+    cluster_selection_epsilon: 0.0
+    gen_min_span_tree: True
+
