@@ -3,7 +3,7 @@
 nextflow.enable.dsl = 2
 
 // Default params
-params.background_color = "light"
+params.background_color = ""
 
 debug_flag = true
 
