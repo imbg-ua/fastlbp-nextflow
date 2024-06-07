@@ -4,8 +4,10 @@ outdir: '/path/to/outdir'
 
 # --- choose from the following or leave blank to not use the mask --- #
 # mask: '/path/to/mask/or/any/other/annotations'
+# background_color: [255, 255, 255] # default is 0 
+
 # mask: auto
-background_color: [255, 255, 255] # default is 0 
+# background_color: light/dark
 
 
 # --- select number of threads and output file names for fastLBP --- #

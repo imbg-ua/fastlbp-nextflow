@@ -2,6 +2,9 @@
 
 nextflow.enable.dsl = 2
 
+// Default params
+params.background_color = "light"
+
 debug_flag = true
 
 if ( !nextflow.version.matches(">=24.04") ) {
@@ -108,15 +111,17 @@ process get_tissue_mask {
     publishDir "${params.outdir}", mode: "copy"
 
     input:
-    path(img)
+    tuple path(img), val(background_type)
 
     output:
-    path('pixelmask.npy')
+    tuple path(img), path('pixelmask.npy')
 
     script:
+    background_type_param = background_type ? "--background ${background_type}" : ""
     """
     get_mask.py get_mask \
-        --img_path ${img}
+        --img_path ${img} \
+        ${background_type_param}
     """
 }
 
@@ -351,23 +356,23 @@ workflow SingleImage {
 
         info_log("Otsu mask mode")
 
-        get_tissue_mask(params.img_path)
+        get_tissue_mask(tuple(params.img_path, params.background_color))
 
         get_tissue_mask.out
             .set { pixel_mask_ch }
 
         get_tissue_mask.out
             .combine(lbp_combinations_hash_outdir)
-            .map { pixelmask, lbp_outdir, lbp_params ->
-            tuple(lbp_outdir, params.img_path, pixelmask, extract_patchsize_from_lbp_params_list(lbp_params)) }
+            .map { imgg, pixelmask, lbp_outdir, lbp_params ->
+            tuple(lbp_outdir, imgg, pixelmask, extract_patchsize_from_lbp_params_list(lbp_params)) }
             .set {downscale_me}
 
         downscale_mask(downscale_me)
         downscale_mask.out
             .combine(lbp_combinations_hash_outdir, by:0)
             .combine(pixel_mask_ch)
-            .map { downscale_outdir, patchmask_path, lbp_params, pixelmask_path ->
-            tuple(downscale_outdir, params.img_path, pixelmask_path, patchmask_path, lbp_params) }
+            .map { downscale_outdir, patchmask_path, lbp_params, imgg, pixelmask_path ->
+            tuple(downscale_outdir, imgg, pixelmask_path, patchmask_path, lbp_params) }
             .set { feed_me_into_lbp }
 
         fastlbp(feed_me_into_lbp)
@@ -408,7 +413,7 @@ workflow SingleImage {
         info_log("Provided mask mode")
 
         convert_to_binmask_ch = Channel.of([params.img_path, params.mask, 
-        params.background_color ? params.background_color : ""])
+        params.background_color])
 
         convert_annotations_to_binmask(convert_to_binmask_ch)
 

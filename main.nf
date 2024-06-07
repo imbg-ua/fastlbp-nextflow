@@ -2,6 +2,9 @@
 
 nextflow.enable.dsl = 2
 
+// Default params
+params.background_color = "light"
+
 debug_flag = true
 
 if ( !nextflow.version.matches(">=24.04") ) {
@@ -56,16 +59,18 @@ process get_tissue_mask {
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
-    path(img)
+    tuple path(img), val(background_type)
 
     output:
     tuple path(img), path('pixelmask.npy')
 
     script:
     img_id = img.getBaseName()
+    background_type_param = background_type ? "--background ${background_type}" : ""
     """
     get_mask.py get_mask \
         --img_path ${img} \
+        ${background_type_param}
     """
 }
 
@@ -215,7 +220,7 @@ workflow SingleImage {
         
         info_log("Otsu mask mode")
 
-        get_tissue_mask(params.img_path)
+        get_tissue_mask(tuple(params.img_path, params.background_color))
 
         get_tissue_mask.out
             .combine([[lbp_params]])
@@ -264,7 +269,7 @@ workflow SingleImage {
         info_log("Provided mask mode")
 
         annot_to_convert = Channel.of([params.img_path, file(params.mask), 
-        params.background_color ? params.background_color : ""])
+        params.background_color])
 
         convert_annotations_to_binmask(annot_to_convert)
 
@@ -453,11 +458,11 @@ workflow MultiImage {
 
         imgs_and_masks_ch
             .branch { 
-                without_mask: it[1] == ""
+                without_mask: (it[1] == "" || it[1] == "no")
                     return it[0]
                 otsu_mask: it[1] == "auto"
-                    return it[0]
-                with_mask: it[1] != ""
+                    return it
+                with_mask: (it[1] != "" && it[1] != "no") // TODO: not sure how branching conditions work
                     return it
              }
              .set { imgs_and_masks_ch_split }
@@ -490,6 +495,8 @@ workflow MultiImage {
         // process images using Otsu's method //
         // ---------------------------------- //
         imgs_and_masks_ch_split.otsu_mask
+            .map { imgg, mask_mode_auto, bg_shade ->
+            tuple(imgg, bg_shade) }
             .set { imgs_to_get_masks }
         OtsuWorkflow(imgs_to_get_masks)
            
@@ -533,6 +540,8 @@ workflow MultiImage {
             info_log("Otsu mask mode")
             
             imgs_ch = Channel.fromList(imgs)
+            imgs_ch
+                .map { tuple(it, params.background_color) }
             get_tissue_mask(imgs_ch)
 
             get_tissue_mask.out

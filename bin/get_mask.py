@@ -113,13 +113,19 @@ def downscale_using_patchsize(
 def get_mask(
     img_path: str,
     blur_k: int=54,
+    background: str='light',
     savefile: str='pixelmask.npy') -> None:
 
     img = ut.read_img(img_path)
     img_grayscale = img_arr_to_grayscale(img)
     img_blurred = blur_img(img_grayscale, blur_k)
     background_mask = get_otsu_mask(img_blurred)
-    tissue_mask = ~background_mask
+
+    if background == 'light':
+        tissue_mask = ~background_mask
+    elif background == 'dark':
+        tissue_mask = background_mask
+
     np.save(savefile, tissue_mask)
 
 if __name__ == '__main__':
