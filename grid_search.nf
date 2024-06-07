@@ -78,6 +78,30 @@ def createCombinations(method_params) {
     return all_combs_final
 }
 
+process convert_annotations_to_binmask {
+    tag "mask preprocessing"
+    debug debug_flag
+    publishDir "${params.outdir}", mode: "copy"
+
+    input:
+    tuple path(img), path(mask), val(background_val_str)
+
+    output:
+    tuple path(img), path(binmask)
+
+    script:
+    binmask = "binmask.npy"
+    background_val = background_val_str ? "--background_val_str \"${background_val_str}\"" : ""
+    """
+    get_mask.py check_annotations \
+        --annotations ${mask} \
+        ${background_val} \
+        --savefile ${binmask}
+    """
+
+}
+
+
 process get_tissue_mask {
     tag "preprocessing"
     debug debug_flag
@@ -224,38 +248,45 @@ workflow SingleImage {
     // TODO: find a more concise way to do this
 
     // check if params for each step are given explicitly or as a path to a tsv file
-    if ( params.args_tsv.lbp ) {
-        def tsv_lbp_args = Channel.fromPath(params.args_tsv.lbp)
-        tsv_lbp_args
-            .splitCsv(header:true, sep:'\t')
-            .map { row -> row.collect { param_k, param_v -> tuple(param_k, param_v) } }
-            .set { lbp_combinations }
-    } else {
-        def lbp_step = params.args.lbp
-        lbp_combinations = createCombinations(lbp_step)
-    }
-    
-    if ( params.args_tsv.umap ) {
-        def tsv_umap_args = Channel.fromPath(params.args_tsv.umap)
-        tsv_umap_args
-            .splitCsv(header:true, sep:'\t')
-            .map { row -> row.collect { param_k, param_v -> tuple(param_k, param_v) } }
-            .set { umap_combinations }
-    } else {
-        def umap_step = params.args.umap
-        umap_combinations = createCombinations(umap_step)
-    }
+    if ( params.args_tsv ) {
+        if ( params.args_tsv.lbp ) {
+            def tsv_lbp_args = Channel.fromPath(params.args_tsv.lbp)
+            tsv_lbp_args
+                .splitCsv(header:true, sep:'\t')
+                .map { row -> row.collect { param_k, param_v -> tuple(param_k, param_v) } }
+                .set { lbp_combinations }
+        } else {
+            def lbp_step = params.args.lbp
+            lbp_combinations = createCombinations(lbp_step)
+        }
 
-    if ( params.args_tsv.hdbscan ) {
-        def tsv_hdbscan_args = Channel.fromPath(params.args_tsv.hdbscan)
-        tsv_hdbscan_args
-            .splitCsv(header:true, sep:'\t')
-            .map { row -> row.collect { param_k, param_v -> tuple(param_k, param_v) } }
-            .set { hdbscan_combinations }
+        if ( params.args_tsv.umap ) {
+            def tsv_umap_args = Channel.fromPath(params.args_tsv.umap)
+            tsv_umap_args
+                .splitCsv(header:true, sep:'\t')
+                .map { row -> row.collect { param_k, param_v -> tuple(param_k, param_v) } }
+                .set { umap_combinations }
+        } else {
+            def umap_step = params.args.umap
+            umap_combinations = createCombinations(umap_step)
+        }
+        if ( params.args_tsv.hdbscan ) {
+            def tsv_hdbscan_args = Channel.fromPath(params.args_tsv.hdbscan)
+            tsv_hdbscan_args
+                .splitCsv(header:true, sep:'\t')
+                .map { row -> row.collect { param_k, param_v -> tuple(param_k, param_v) } }
+                .set { hdbscan_combinations }
+        } else {
+            def hdbscan_step = params.args.hdbscan
+            hdbscan_combinations = createCombinations(hdbscan_step)
+        }
+
     } else {
-        def hdbscan_step = params.args.hdbscan
-        hdbscan_combinations = createCombinations(hdbscan_step)
-    }
+        // no tsv arguments provided
+        lbp_combinations = createCombinations(params.args.lbp)
+        umap_combinations = createCombinations(params.args.umap)
+        hdbscan_combinations = createCombinations(params.args.hdbscan)
+    }   
 
     // generate output dir names for each combination of parameters
     lbp_combinations
@@ -376,17 +407,27 @@ workflow SingleImage {
 
         info_log("Provided mask mode")
 
-        lbp_combinations_hash_outdir
-            .map { lbp_outdir, lbp_params ->
-            tuple(lbp_outdir, params.img_path, params.mask, extract_patchsize_from_lbp_params_list(lbp_params)) }
+        convert_to_binmask_ch = Channel.of([params.img_path, params.mask, 
+        params.background_color ? params.background_color : ""])
+
+        convert_annotations_to_binmask(convert_to_binmask_ch)
+
+        convert_annotations_to_binmask.out
+            .set { converted_mask_ch }
+
+        convert_annotations_to_binmask.out
+            .combine(lbp_combinations_hash_outdir)
+            .map { imgg, maskk, lbp_outdirr, lbp_paramss ->
+            tuple(lbp_outdirr, imgg, maskk, extract_patchsize_from_lbp_params_list(lbp_paramss)) }
             .set { downscale_me }
 
         downscale_mask(downscale_me)
 
         downscale_mask.out
             .combine(lbp_combinations_hash_outdir, by:0)
-            .map { downscale_outdir, patchmask_path, lbp_params ->
-            tuple(downscale_outdir, params.img_path, params.mask, patchmask_path, lbp_params) }
+            .combine(converted_mask_ch)
+            .map { downscale_outdir, patchmask_path, lbp_params, imgg, binmaskk ->
+            tuple(downscale_outdir, imgg, binmaskk, patchmask_path, lbp_params) }
             .set { feed_me_into_lbp }
 
         fastlbp(feed_me_into_lbp)

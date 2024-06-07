@@ -39,8 +39,6 @@ def check_annotations(annotations: str, background_val_str: str = "", savefile: 
     else:
         background_val = ut.convert_to_proper_type(background_val_str)
 
-    print(f'{background_val = } DEBUG')
-
     if len(annot.shape) > 2:
         tissue_mask = annot_to_tissue_binmask(annot, background_val)
     elif len(annot.shape) == 2:
