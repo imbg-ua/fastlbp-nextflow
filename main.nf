@@ -26,13 +26,37 @@ def lbp_params = params.args.lbp.collect { k, v -> [k, v] }
 def umap_params = params.args.umap.collect { k, v -> [k, v] }
 def hdbscan_params = params.args.hdbscan.collect { k, v -> [k, v] }
 
+
+process convert_annotations_to_binmask {
+    tag "mask preprocessing"
+    debug debug_flag
+    publishDir "${params.outdir}/${img_id}", mode: "copy"
+
+    input:
+    tuple path(img), path(mask), val(background_val_str)
+
+    output:
+    tuple path(img), path(binmask)
+
+    script:
+    img_id = img.getBaseName()
+    binmask = "binmask.npy"
+    background_val = background_val_str ? "--background_val_str \"${background_val_str}\"" : ""
+    """
+    get_mask.py check_annotations \
+        --annotations ${mask} \
+        ${background_val} \
+        --savefile ${binmask}
+    """
+} 
+
 process get_tissue_mask {
     tag "${img_id}"
     debug debug_flag
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
-    tuple path(img)
+    path(img)
 
     output:
     tuple path(img), path('pixelmask.npy')
@@ -191,8 +215,7 @@ workflow SingleImage {
         
         info_log("Otsu mask mode")
 
-        img = Channel.of([params.img_path])
-        get_tissue_mask(img)
+        get_tissue_mask(params.img_path)
 
         get_tissue_mask.out
             .combine([[lbp_params]])
@@ -235,9 +258,18 @@ workflow SingleImage {
 
         labels_to_patch_img(convert_my_labels_to_img)
     } else {
+
+        // Mask mode
         
         info_log("Provided mask mode")
-        img_and_mask = Channel.of([params.img_path, file(params.mask)])
+
+        annot_to_convert = Channel.of([params.img_path, file(params.mask), 
+        params.background_color ? params.background_color : ""])
+
+        convert_annotations_to_binmask(annot_to_convert)
+
+        convert_annotations_to_binmask.out
+            .set { img_and_mask }
         
         img_and_mask
             .combine([[lbp_params]])
@@ -415,7 +447,7 @@ workflow MultiImage {
         imgs_and_masks
             .splitCsv(header:true, sep:'\t')
             .map { row -> 
-            tuple(row.image, row.mask, extract_patchsize_from_lbp_params_list(lbp_params)) }
+            tuple(row.image, row.mask, row.background_color ? row.background_color : "" ) }
             .set { imgs_and_masks_ch }
 
 
@@ -434,7 +466,15 @@ workflow MultiImage {
         // process images with masks //
         // ------------------------- //
         imgs_and_masks_ch_split.with_mask
+            .set { convert_me_to_binmask }
+
+        convert_annotations_to_binmask(convert_me_to_binmask)
+        
+        convert_annotations_to_binmask.out
+            .map { imgg, binmaskk ->
+            tuple(imgg, binmaskk,  extract_patchsize_from_lbp_params_list(lbp_params)) }
             .set { downscale_me_with_mask }
+        
         ProvidedMaskWorkflow(downscale_me_with_mask)
 
         // ---------------------------- //

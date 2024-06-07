@@ -10,6 +10,47 @@ from PIL import Image
 
 Image.MAX_IMAGE_PIXELS = None
 
+def annot_to_tissue_binmask(annot_img: np.array, background_val: list | None = None) -> np.array:
+    annot_img = annot_img.reshape((annot_img.shape[0], annot_img.shape[1], -1))
+    channels_num = annot_img.shape[2]
+
+    # default background value is 0 for each channel
+    if background_val is None:
+        background_val = np.repeat(0, channels_num)
+    else:
+        background_val = np.array(background_val)
+
+    background_mask = np.ones((annot_img.shape[0], annot_img.shape[1]), dtype=np.bool_)
+
+    for channel in range(channels_num):
+        channel_mask = annot_img[..., channel] == background_val[channel]
+        background_mask &= channel_mask
+
+    return ~background_mask
+
+# TODO: make this step optional in the pipeline
+# (if annotations are already 2D, don't duplicate them in binmask.npy)
+def check_annotations(annotations: str, background_val_str: str = "", savefile: str = 'binmask.npy') -> None:
+    annot = ut.read_img(annotations)
+
+    # TODO: refactor this
+    if background_val_str == "":
+        background_val = None
+    else:
+        background_val = ut.convert_to_proper_type(background_val_str)
+
+    print(f'{background_val = } DEBUG')
+
+    if len(annot.shape) > 2:
+        tissue_mask = annot_to_tissue_binmask(annot, background_val)
+    elif len(annot.shape) == 2:
+        tissue_mask = annot
+    else:
+        raise ValuError('Annnotations shape is not valid.')
+
+    np.save(savefile, tissue_mask)
+    
+
 def img_arr_to_grayscale(img_arr: np.array) -> np.array:
     return np.dot(img_arr[..., :3], np.array([0.299, 0.587, 0.114])).astype(np.uint8)
 

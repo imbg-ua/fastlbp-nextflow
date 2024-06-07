@@ -1,5 +1,5 @@
-image	mask
-/path/to/image_1	/path/to/annotations_1
-/path/to/image_2	/path/to/annotations_2
+image	mask	background_color
+/path/to/image_1	/path/to/annotations_1	[255, 255, 255]
+/path/to/image_2	/path/to/annotations_2	[255, 255, 255]
 /path/to/image_3	
 /path/to/image_4	auto
