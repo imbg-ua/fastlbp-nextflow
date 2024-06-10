@@ -52,7 +52,7 @@ def check_annotations(annotations: str, background_val_str: str = "", savefile: 
 def img_arr_to_grayscale(img_arr: np.array) -> np.array:
     return np.dot(img_arr[..., :3], np.array([0.299, 0.587, 0.114])).astype(np.uint8)
 
-def blur_img(img_arr: np.array, k: int=54) -> np.array:    
+def blur_img(img_arr: np.array, k: int=54) -> np.array:
     blurred_img = ndimage.uniform_filter(img_arr, size=k)
     return blurred_img
 

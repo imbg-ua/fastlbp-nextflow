@@ -81,6 +81,43 @@ def createCombinations(method_params) {
     return all_combs_final
 }
 
+
+process copy_files_to_target_dir {
+    tag "wrapping up"
+    debug debug_flag
+    publishDir "${outdir}", mode: "copy"
+
+    input:
+    tuple val(outdir), path(data)
+
+    output:
+    tuple val(outdir), path(data)
+    
+    script:
+    """
+    """
+}
+
+process combinations_metadata_to_tsv {
+    tag "wrapping up"
+    debug debug_flag
+    publishDir "${params.outdir}", mode: "copy"
+
+    input:
+    val(params_and_hash_str)
+
+    output:
+    path(metadata_csv)
+
+    script:
+    metadata_csv = "hash_to_combination.tsv"
+    """
+    params_to_hash.py \
+        --params_list_str "${params_and_hash_str}" \
+        --savefile ${metadata_csv}
+    """
+}
+
 process convert_annotations_to_binmask {
     tag "mask preprocessing"
     debug debug_flag
@@ -146,7 +183,7 @@ process get_tissue_mask {
 
 process downscale_mask {
     debug debug_flag
-    publishDir "${step_outdir}", mode: "copy"
+    // publishDir "${step_outdir}", mode: "copy"
 
     input:
     tuple val(step_outdir), path(img), path(pixelmask), val(patchsize)
@@ -166,13 +203,13 @@ process downscale_mask {
 
 process fastlbp {
     debug debug_flag
-    publishDir "${step_outdir}", mode: "copy"
+    // publishDir "${step_outdir}", mode: "copy"
 
     input:
     tuple val(step_outdir), path(img), path(mask), path(patchmask), val(params_str)
 
     output:
-    path("data")
+    tuple val(step_outdir), path("data"), emit: lbp_data_folder
     tuple val(step_outdir), path("data/out/${file(params.constargs.lbp.outfile_name).getBaseName()}_flattened.npy"), emit: lbp_result_file_flattened
     tuple val(step_outdir), path("data/out/${file(params.constargs.lbp.outfile_name).getBaseName()}.npy"), emit: lbp_result_file_img
 
@@ -193,7 +230,7 @@ process fastlbp {
 
 process umap {
     debug debug_flag
-    publishDir "${step_outdir}", mode: "copy"
+    // publishDir "${step_outdir}", mode: "copy"
 
     input:
     tuple val(step_outdir), path(lbp_result_flattened), val(params_str)
@@ -211,7 +248,7 @@ process umap {
 
 process hdbscan {
     debug debug_flag
-    publishDir "${step_outdir}", mode: "copy"
+    // publishDir "${step_outdir}", mode: "copy"
 
     input:
     tuple val(step_outdir), path(data), val(params_str)
@@ -229,7 +266,7 @@ process hdbscan {
 
 process labels_to_patch_img {
     debug debug_flag
-    publishDir "${step_outdir}", mode: "copy"
+    // publishDir "${step_outdir}", mode: "copy"
 
     input:
     tuple val(step_outdir), path(labels_data), path(patchmask), path(lbp_output)
@@ -248,6 +285,7 @@ process labels_to_patch_img {
     """
 }
 
+// TODO: implement repeating parts as subworkflows
 workflow SingleImage {
 
     // TODO: find a more concise way to do this
@@ -296,17 +334,17 @@ workflow SingleImage {
     // generate output dir names for each combination of parameters
     lbp_combinations
         .map { it -> 
-        tuple("${params.outdir}/${it.flatten().collect().join('_').toString()}", it) }
+        tuple("${it.toString()}", it) }
         .set { lbp_combinations_hash_outdir }
 
     umap_combinations
         .map { it ->
-        tuple("${it.flatten().collect().join('_').toString()}", it) }
+        tuple("${it.toString()}", it) }
         .set { umap_combinations_hash_outdir }
 
     hdbscan_combinations
         .map { it ->
-        tuple("${it.flatten().collect().join('_').toString()}", it) }
+        tuple("${it.toString()}", it) }
         .set { hdbscan_combinations_hash_outdir }
 
     if ( !params.mask ) {
@@ -320,6 +358,9 @@ workflow SingleImage {
         
         fastlbp(feed_me_into_lbp)
 
+        fastlbp.out.lbp_data_folder
+            .set { all_lbp_outputs }
+
         fastlbp.out.lbp_result_file_flattened
             .combine(umap_combinations_hash_outdir)
             .map { lbp_outdir, lbp_result_flattened_cur, umap_params_str, umap_params ->
@@ -332,12 +373,18 @@ workflow SingleImage {
         umap(feed_me_into_umap)
 
         umap.out
+            .set { all_umap_outputs }
+
+        umap.out
             .combine(hdbscan_combinations_hash_outdir)
             .map { umap_outdir, umap_embeddings, hdbscan_params_str, hdbscan_params ->
             tuple("${umap_outdir}/${hdbscan_params_str}", umap_embeddings, hdbscan_params) }
             .set { feed_me_into_hdbscan }
 
         hdbscan(feed_me_into_hdbscan)
+
+        hdbscan.out
+            .set { all_hdbscan_outputs }
 
         lbp_img
             .join(feed_me_into_lbp)
@@ -351,6 +398,36 @@ workflow SingleImage {
             .set { convert_me_back_to_image }
 
         labels_to_patch_img(convert_me_back_to_image)
+
+        labels_to_patch_img.out
+            .set { all_deconvolves_images_outputs }
+
+        all_lbp_outputs
+            .combine(all_umap_outputs)
+            .combine(all_hdbscan_outputs)
+            .combine(all_deconvolves_images_outputs)
+            .filter { it[2].contains(it[0]) && it[4].contains(it[2]) && it[6].contains(it[4]) }
+            .multiMap { lbp_outdirr, lbp_dataa, umap_outdirr, umap_dataa, hdbscan_outdirr, hdbscan_dataa, 
+            deconvolve_outdirr, deconvolve_dataa ->
+            // replace commas with semicolons to distinguish between inner parameters list and
+            // outer combination-to-hash list 
+            data_to_save: tuple(deconvolve_outdirr.replaceAll(",", ";").md5(), tuple(lbp_dataa, umap_dataa, hdbscan_dataa, deconvolve_dataa))
+            dir_and_hash: tuple(deconvolve_outdirr.replaceAll(",", ";"), deconvolve_outdirr.replaceAll(",", ";").md5()) }
+            .set { final_data_and_folders }
+
+        final_data_and_folders.data_to_save
+            .transpose()
+            .map { params_hash, step_dataa ->
+            tuple("${params.outdir}/${params_hash}", step_dataa) }
+            .set { dirs_and_data_to_save }
+
+        copy_files_to_target_dir(dirs_and_data_to_save)
+
+        final_data_and_folders.dir_and_hash
+            .toList()
+            .set { combinations_metadata }
+        
+        combinations_metadata_to_tsv(combinations_metadata)
 
     } else if ( params.mask == "auto" ) {
 
@@ -368,6 +445,10 @@ workflow SingleImage {
             .set {downscale_me}
 
         downscale_mask(downscale_me)
+
+        downscale_mask.out
+            .set { all_downscale_outputs }
+
         downscale_mask.out
             .combine(lbp_combinations_hash_outdir, by:0)
             .combine(pixel_mask_ch)
@@ -376,6 +457,9 @@ workflow SingleImage {
             .set { feed_me_into_lbp }
 
         fastlbp(feed_me_into_lbp)
+
+        fastlbp.out.lbp_data_folder
+            .set { all_lbp_outputs }
 
         fastlbp.out.lbp_result_file_flattened
             .combine(umap_combinations_hash_outdir)
@@ -389,12 +473,18 @@ workflow SingleImage {
         umap(feed_me_into_umap)
 
         umap.out
+            .set { all_umap_outputs }
+
+        umap.out
             .combine(hdbscan_combinations_hash_outdir)
             .map { umap_outdir, umap_embeddings, hdbscan_params_str, hdbscan_params ->
             tuple("${umap_outdir}/${hdbscan_params_str}", umap_embeddings, hdbscan_params) }
             .set { feed_me_into_hdbscan }
 
         hdbscan(feed_me_into_hdbscan)
+
+        hdbscan.out
+            .set { all_hdbscan_outputs }
 
         lbp_img
             .join(feed_me_into_lbp)
@@ -408,6 +498,39 @@ workflow SingleImage {
             .set { convert_me_back_to_image }
 
         labels_to_patch_img(convert_me_back_to_image)
+
+        labels_to_patch_img.out
+            .set { all_deconvolves_images_outputs }
+
+        all_downscale_outputs
+            .combine(all_lbp_outputs)
+            .combine(all_umap_outputs)
+            .combine(all_hdbscan_outputs)
+            .combine(all_deconvolves_images_outputs)
+            .filter { it[2].contains(it[0]) && it[4].contains(it[2]) && 
+            it[6].contains(it[4]) && it[8].contains(it[6]) } // as there is additional step as compared to no mask 
+            .multiMap { downscale_outdirr, downscale_dataa, lbp_outdirr, lbp_dataa, umap_outdirr, umap_dataa, hdbscan_outdirr, hdbscan_dataa, 
+            deconvolve_outdirr, deconvolve_dataa ->
+            // replace commas with semicolons to distinguish between inner parameters list and
+            // outer combination-to-hash list 
+            data_to_save: tuple(deconvolve_outdirr.replaceAll(",", ";").md5(), tuple(downscale_dataa, lbp_dataa, umap_dataa, hdbscan_dataa, deconvolve_dataa))
+            dir_and_hash: tuple(deconvolve_outdirr.replaceAll(",", ";"), deconvolve_outdirr.replaceAll(",", ";").md5()) }
+            .set { final_data_and_folders }
+
+        final_data_and_folders.data_to_save
+            .transpose()
+            .map { params_hash, step_dataa ->
+            tuple("${params.outdir}/${params_hash}", step_dataa) }
+            .set { dirs_and_data_to_save }
+
+        copy_files_to_target_dir(dirs_and_data_to_save)
+
+        final_data_and_folders.dir_and_hash
+            .toList()
+            .set { combinations_metadata }
+        
+        combinations_metadata_to_tsv(combinations_metadata)
+
     } else {
 
         info_log("Provided mask mode")
@@ -429,6 +552,9 @@ workflow SingleImage {
         downscale_mask(downscale_me)
 
         downscale_mask.out
+            .set { all_downscale_outputs }
+
+        downscale_mask.out
             .combine(lbp_combinations_hash_outdir, by:0)
             .combine(converted_mask_ch)
             .map { downscale_outdir, patchmask_path, lbp_params, imgg, binmaskk ->
@@ -436,6 +562,9 @@ workflow SingleImage {
             .set { feed_me_into_lbp }
 
         fastlbp(feed_me_into_lbp)
+
+        fastlbp.out.lbp_data_folder
+            .set { all_lbp_outputs }
 
         fastlbp.out.lbp_result_file_flattened
             .combine(umap_combinations_hash_outdir)
@@ -449,12 +578,18 @@ workflow SingleImage {
         umap(feed_me_into_umap)
 
         umap.out
+            .set { all_umap_outputs }
+
+        umap.out
             .combine(hdbscan_combinations_hash_outdir)
             .map { umap_outdir, umap_embeddings, hdbscan_params_str, hdbscan_params ->
             tuple("${umap_outdir}/${hdbscan_params_str}", umap_embeddings, hdbscan_params) }
             .set { feed_me_into_hdbscan }
 
         hdbscan(feed_me_into_hdbscan)
+
+        hdbscan.out
+            .set { all_hdbscan_outputs }
 
         lbp_img
             .join(feed_me_into_lbp)
@@ -468,6 +603,39 @@ workflow SingleImage {
             .set { convert_me_back_to_image }
 
         labels_to_patch_img(convert_me_back_to_image)
+
+        labels_to_patch_img.out
+            .set { all_deconvolves_images_outputs }
+
+        all_downscale_outputs
+            .combine(all_lbp_outputs)
+            .combine(all_umap_outputs)
+            .combine(all_hdbscan_outputs)
+            .combine(all_deconvolves_images_outputs)
+            .filter { it[2].contains(it[0]) && it[4].contains(it[2]) && 
+            it[6].contains(it[4]) && it[8].contains(it[6]) } // as there is additional step as compared to no mask 
+            .multiMap { downscale_outdirr, downscale_dataa, lbp_outdirr, lbp_dataa, umap_outdirr, umap_dataa, hdbscan_outdirr, hdbscan_dataa, 
+            deconvolve_outdirr, deconvolve_dataa ->
+            // replace commas with semicolons to distinguish between inner parameters list and
+            // outer combination-to-hash list 
+            data_to_save: tuple(deconvolve_outdirr.replaceAll(",", ";").md5(), tuple(downscale_dataa, lbp_dataa, umap_dataa, hdbscan_dataa, deconvolve_dataa))
+            dir_and_hash: tuple(deconvolve_outdirr.replaceAll(",", ";"), deconvolve_outdirr.replaceAll(",", ";").md5()) }
+            .set { final_data_and_folders }
+
+        final_data_and_folders.data_to_save
+            .transpose()
+            .map { params_hash, step_dataa ->
+            tuple("${params.outdir}/${params_hash}", step_dataa) }
+            .set { dirs_and_data_to_save }
+
+        copy_files_to_target_dir(dirs_and_data_to_save)
+
+        final_data_and_folders.dir_and_hash
+            .toList()
+            .set { combinations_metadata }
+        
+        combinations_metadata_to_tsv(combinations_metadata)
+
     }
 }
 
