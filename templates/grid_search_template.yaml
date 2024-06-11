@@ -32,14 +32,19 @@ args:
     npoints:
       values: [[5, 6], [7, 8]]
       bind_to: "patchsize"
-  umap:
+  dimred:
+    method: pca # [umap (pip-umap-learn==0.5.5), tsne (scikit-learn==1.3.2), pca (scikit-learn==1.3.2)], default: umap
     n_components: 20
-    n_neighbors: [20, 30]
-    min_dist: 0.0
-    random_state: 42
-  hdbscan:
-    min_samples: 1
-    min_cluster_size: [300, 500]
-    cluster_selection_epsilon: 0.0
-    gen_min_span_tree: True
+    # # You must specify only valid parameters according to each method's documentation
+    # n_components: 20
+    # n_neighbors: [20, 30]
+    # min_dist: 0.0
+    # random_state: 42
+  clustering:
+    method: k_means # [hdbscan (pip-hdbscan==0.8.33), k_means (scikit-learn==1.3.2)], default: hdbscan
+    n_clusters: [4, 7]
+    # min_samples: 1
+    # min_cluster_size: [300, 500]
+    # cluster_selection_epsilon: 0.0
+    # gen_min_span_tree: True
 

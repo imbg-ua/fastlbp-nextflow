@@ -22,6 +22,7 @@ def extract_patchsize_from_lbp_params_list(lbp_params_list) {
     res[1]
 }
 
+// TODO: refactor
 def createCombinations(method_params) {
     // total number of parameters for the method
     def method_params_num = method_params.size()
@@ -78,7 +79,7 @@ def createCombinations(method_params) {
     def all_combs_final = all_combs_flat.flatMap{ kkk -> kkk }.collate(method_params_num * 2)
         .map { aboba -> aboba.collate(2) }
 
-    return all_combs_final
+    return all_combs_final.distinct() // TODO: optimise this
 }
 
 
@@ -228,15 +229,16 @@ process fastlbp {
     """
 }
 
-process umap {
+process dimred {
     debug debug_flag
+    tag "${params.args.dimred.method}"
     // publishDir "${step_outdir}", mode: "copy"
 
     input:
     tuple val(step_outdir), path(lbp_result_flattened), val(params_str)
 
     output:
-    tuple val(step_outdir), path("umap_embeddings.npy")
+    tuple val(step_outdir), path("embeddings.npy")
 
     script:
     """
@@ -246,15 +248,16 @@ process umap {
     """
 }
 
-process hdbscan {
+process clustering {
     debug debug_flag
+    tag "${params.args.clustering.method}"
     // publishDir "${step_outdir}", mode: "copy"
 
     input:
     tuple val(step_outdir), path(data), val(params_str)
 
     output:
-    tuple val(step_outdir), path("hdbscan_labels.npy")
+    tuple val(step_outdir), path("clustering_labels.npy")
 
     script:
     """
@@ -303,33 +306,35 @@ workflow SingleImage {
             lbp_combinations = createCombinations(lbp_step)
         }
 
-        if ( params.args_tsv.umap ) {
-            def tsv_umap_args = Channel.fromPath(params.args_tsv.umap)
+        if ( params.args_tsv.dimred ) {
+            def tsv_umap_args = Channel.fromPath(params.args_tsv.dimred)
             tsv_umap_args
                 .splitCsv(header:true, sep:'\t')
                 .map { row -> row.collect { param_k, param_v -> tuple(param_k, param_v) } }
                 .set { umap_combinations }
         } else {
-            def umap_step = params.args.umap
+            def umap_step = params.args.dimred
             umap_combinations = createCombinations(umap_step)
         }
-        if ( params.args_tsv.hdbscan ) {
-            def tsv_hdbscan_args = Channel.fromPath(params.args_tsv.hdbscan)
+        if ( params.args_tsv.clustering ) {
+            def tsv_hdbscan_args = Channel.fromPath(params.args_tsv.clustering)
             tsv_hdbscan_args
                 .splitCsv(header:true, sep:'\t')
                 .map { row -> row.collect { param_k, param_v -> tuple(param_k, param_v) } }
                 .set { hdbscan_combinations }
         } else {
-            def hdbscan_step = params.args.hdbscan
+            def hdbscan_step = params.args.clustering
             hdbscan_combinations = createCombinations(hdbscan_step)
         }
 
     } else {
         // no tsv arguments provided
         lbp_combinations = createCombinations(params.args.lbp)
-        umap_combinations = createCombinations(params.args.umap)
-        hdbscan_combinations = createCombinations(params.args.hdbscan)
-    }   
+        umap_combinations = createCombinations(params.args.dimred)
+        hdbscan_combinations = createCombinations(params.args.clustering)
+    }
+
+    hdbscan_combinations.view() // DEBUG
 
     // generate output dir names for each combination of parameters
     lbp_combinations
@@ -370,27 +375,27 @@ workflow SingleImage {
         fastlbp.out.lbp_result_file_img
             .set { lbp_img }
 
-        umap(feed_me_into_umap)
+        dimred(feed_me_into_umap)
 
-        umap.out
+        dimred.out
             .set { all_umap_outputs }
 
-        umap.out
+        dimred.out
             .combine(hdbscan_combinations_hash_outdir)
             .map { umap_outdir, umap_embeddings, hdbscan_params_str, hdbscan_params ->
             tuple("${umap_outdir}/${hdbscan_params_str}", umap_embeddings, hdbscan_params) }
             .set { feed_me_into_hdbscan }
 
-        hdbscan(feed_me_into_hdbscan)
+        clustering(feed_me_into_hdbscan)
 
-        hdbscan.out
+        clustering.out
             .set { all_hdbscan_outputs }
 
         lbp_img
             .join(feed_me_into_lbp)
             .set { lbp_and_masks }
 
-        hdbscan.out
+        clustering.out
             .combine(lbp_and_masks)
             .filter { it[0].toString().contains(it[2].toString()) } // hdbscan_outdir, hdbscan_labels_path, lbp_outdir, lbp_img_path, img_path, pixelmask_path, patchmask_path, lbp_params
             .map { hdbscan_outdir, hdbscan_labels_path, lbp_outdir, lbp_img_path, img_path, pixelmask_path, patchmask_path, lbp_params ->
@@ -470,27 +475,27 @@ workflow SingleImage {
         fastlbp.out.lbp_result_file_img
             .set { lbp_img }
 
-        umap(feed_me_into_umap)
+        dimred(feed_me_into_umap)
 
-        umap.out
+        dimred.out
             .set { all_umap_outputs }
 
-        umap.out
+        dimred.out
             .combine(hdbscan_combinations_hash_outdir)
             .map { umap_outdir, umap_embeddings, hdbscan_params_str, hdbscan_params ->
             tuple("${umap_outdir}/${hdbscan_params_str}", umap_embeddings, hdbscan_params) }
             .set { feed_me_into_hdbscan }
 
-        hdbscan(feed_me_into_hdbscan)
+        clustering(feed_me_into_hdbscan)
 
-        hdbscan.out
+        clustering.out
             .set { all_hdbscan_outputs }
 
         lbp_img
             .join(feed_me_into_lbp)
             .set { lbp_and_masks }
 
-        hdbscan.out
+        clustering.out
             .combine(lbp_and_masks)
             .filter { it[0].toString().contains(it[2].toString()) } // hdbscan_outdir, hdbscan_labels_path, lbp_outdir, lbp_img_path, img_path, pixelmask_path, patchmask_path, lbp_params
             .map { hdbscan_outdir, hdbscan_labels_path, lbp_outdir, lbp_img_path, img_path, pixelmask_path, patchmask_path, lbp_params ->
@@ -575,27 +580,27 @@ workflow SingleImage {
         fastlbp.out.lbp_result_file_img
             .set { lbp_img }
 
-        umap(feed_me_into_umap)
+        dimred(feed_me_into_umap)
 
-        umap.out
+        dimred.out
             .set { all_umap_outputs }
 
-        umap.out
+        dimred.out
             .combine(hdbscan_combinations_hash_outdir)
             .map { umap_outdir, umap_embeddings, hdbscan_params_str, hdbscan_params ->
             tuple("${umap_outdir}/${hdbscan_params_str}", umap_embeddings, hdbscan_params) }
             .set { feed_me_into_hdbscan }
 
-        hdbscan(feed_me_into_hdbscan)
+        clustering(feed_me_into_hdbscan)
 
-        hdbscan.out
+        clustering.out
             .set { all_hdbscan_outputs }
 
         lbp_img
             .join(feed_me_into_lbp)
             .set { lbp_and_masks }
 
-        hdbscan.out
+        clustering.out
             .combine(lbp_and_masks)
             .filter { it[0].toString().contains(it[2].toString()) } // hdbscan_outdir, hdbscan_labels_path, lbp_outdir, lbp_img_path, img_path, pixelmask_path, patchmask_path, lbp_params
             .map { hdbscan_outdir, hdbscan_labels_path, lbp_outdir, lbp_img_path, img_path, pixelmask_path, patchmask_path, lbp_params ->
