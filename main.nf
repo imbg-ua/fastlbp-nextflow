@@ -26,8 +26,8 @@ def extract_patchsize_from_lbp_params_list(lbp_params_list) {
 def params_args_list = params.args.collect { k, v -> [k, v] }
 
 def lbp_params = params.args.lbp.collect { k, v -> [k, v] }
-def umap_params = params.args.umap.collect { k, v -> [k, v] }
-def hdbscan_params = params.args.hdbscan.collect { k, v -> [k, v] }
+def umap_params = params.args.dimred.collect { k, v -> [k, v] }
+def hdbscan_params = params.args.clustering.collect { k, v -> [k, v] }
 
 
 process convert_annotations_to_binmask {
@@ -122,7 +122,7 @@ process fastlbp {
     """
 }
 
-process umap {
+process dimred {
     tag "${img_id}"
     debug debug_flag
     publishDir "${params.outdir}/${img_id}", mode: "copy"
@@ -131,7 +131,7 @@ process umap {
     tuple val(img_id), path(lbp_result_flattened), val(params_str)
 
     output:
-    tuple val(img_id), path("umap_embeddings.npy")
+    tuple val(img_id), path("embeddings.npy")
 
     script:
     """
@@ -141,7 +141,7 @@ process umap {
     """
 }
 
-process hdbscan {
+process clustering {
     tag "${img_id}"
     debug debug_flag
     publishDir "${params.outdir}/${img_id}", mode: "copy"
@@ -150,7 +150,7 @@ process hdbscan {
     tuple val(img_id), path(data), val(params_str)
 
     output:
-    tuple val(img_id), path("hdbscan_labels.npy")
+    tuple val(img_id), path("clustering_labels.npy")
 
     script:
     """
@@ -200,15 +200,15 @@ workflow SingleImage {
         fastlbp.out.lbp_result_file_img
             .set { lbp_runs }
         
-        umap(feed_me_into_umap)
+        dimred(feed_me_into_umap)
 
-        umap.out
+        dimred.out
             .combine([[hdbscan_params]])
             .set { feed_me_into_hdbscan }
         
-        hdbscan(feed_me_into_hdbscan)
+        clustering(feed_me_into_hdbscan)
 
-        hdbscan.out
+        clustering.out
             .join(lbp_runs)
             .map { img_id, clust_labels, lbp_result ->
             tuple(img_id, clust_labels, [], lbp_result) }
@@ -248,15 +248,15 @@ workflow SingleImage {
         fastlbp.out.lbp_result_file_img
             .set { lbp_runs }
         
-        umap(feed_me_into_umap)
+        dimred(feed_me_into_umap)
 
-        umap.out
+        dimred.out
             .combine([[hdbscan_params]])
             .set { feed_me_into_hdbscan }
         
-        hdbscan(feed_me_into_hdbscan)
+        clustering(feed_me_into_hdbscan)
 
-        hdbscan.out
+        clustering.out
             .join(image_and_patchmask_ch)
             .join(lbp_runs)
             .set { convert_my_labels_to_img }
@@ -302,15 +302,15 @@ workflow SingleImage {
         fastlbp.out.lbp_result_file_img
             .set { lbp_runs }
         
-        umap(feed_me_into_umap)
+        dimred(feed_me_into_umap)
 
-        umap.out
+        dimred.out
             .combine([[hdbscan_params]])
             .set { feed_me_into_hdbscan }
         
-        hdbscan(feed_me_into_hdbscan)
+        clustering(feed_me_into_hdbscan)
 
-        hdbscan.out
+        clustering.out
             .join(image_and_patchmask_ch)
             .join(lbp_runs)
             .set { convert_my_labels_to_img }
@@ -352,15 +352,15 @@ workflow OtsuWorkflow {
     fastlbp.out.lbp_result_file_img
         .set { lbp_runs }
     
-    umap(feed_me_into_umap)
+    dimred(feed_me_into_umap)
 
-    umap.out
+    dimred.out
         .combine([[hdbscan_params]])
         .set { feed_me_into_hdbscan }
     
-    hdbscan(feed_me_into_hdbscan)
+    clustering(feed_me_into_hdbscan)
 
-    hdbscan.out
+    clustering.out
         .join(image_and_patchmask_ch)
         .join(lbp_runs)
         .set { convert_my_labels_to_img }
@@ -383,15 +383,15 @@ workflow NoMaskWorkFlow {
     fastlbp.out.lbp_result_file_img
         .set { lbp_runs }
 
-    umap(feed_me_into_umap)
+    dimred(feed_me_into_umap)
 
-    umap.out
+    dimred.out
         .combine([[hdbscan_params]])
         .set { feed_me_into_hdbscan }
 
-    hdbscan(feed_me_into_hdbscan)
+    clustering(feed_me_into_hdbscan)
 
-    hdbscan.out
+    clustering.out
         .join(lbp_runs)
         .map { img_id, clust_labels, lbp_result ->
         tuple(img_id, clust_labels, [], lbp_result) }
@@ -426,15 +426,15 @@ workflow ProvidedMaskWorkflow {
     fastlbp.out.lbp_result_file_img
         .set { lbp_runs }
 
-    umap(feed_me_into_umap)
+    dimred(feed_me_into_umap)
 
-    umap.out
+    dimred.out
         .combine([[hdbscan_params]])
         .set { feed_me_into_hdbscan }
 
-    hdbscan(feed_me_into_hdbscan)
+    clustering(feed_me_into_hdbscan)
 
-    hdbscan.out
+    clustering.out
         .join(image_and_patchmask_ch)
         .join(lbp_runs)
         .set { convert_my_labels_to_img }
@@ -521,15 +521,15 @@ workflow MultiImage {
             fastlbp.out.lbp_result_file_img
                 .set { lbp_runs }
             
-            umap(feed_me_into_umap)
+            dimred(feed_me_into_umap)
 
-            umap.out
+            dimred.out
                 .combine([[hdbscan_params]])
                 .set { feed_me_into_hdbscan }
             
-            hdbscan(feed_me_into_hdbscan)
+            clustering(feed_me_into_hdbscan)
 
-            hdbscan.out
+            clustering.out
                 .join(lbp_runs)
                 .map { img_id, clust_labels, lbp_result ->
                 tuple(img_id, clust_labels, [], lbp_result) }
@@ -570,15 +570,15 @@ workflow MultiImage {
             fastlbp.out.lbp_result_file_img
                 .set { lbp_runs }
             
-            umap(feed_me_into_umap)
+            dimred(feed_me_into_umap)
 
-            umap.out
+            dimred.out
                 .combine([[hdbscan_params]])
                 .set { feed_me_into_hdbscan }
             
-            hdbscan(feed_me_into_hdbscan)
+            clustering(feed_me_into_hdbscan)
 
-            hdbscan.out
+            clustering.out
                 .join(image_and_patchmask_ch)
                 .join(lbp_runs)
                 .set { convert_my_labels_to_img }
@@ -617,15 +617,15 @@ workflow MultiImage {
             fastlbp.out.lbp_result_file_img
                 .set { lbp_runs }
             
-            umap(feed_me_into_umap)
+            dimred(feed_me_into_umap)
 
-            umap.out
+            dimred.out
                 .combine([[hdbscan_params]])
                 .set { feed_me_into_hdbscan }
             
-            hdbscan(feed_me_into_hdbscan)
+            clustering(feed_me_into_hdbscan)
 
-            hdbscan.out
+            clustering.out
                 .join(image_and_patchmask_ch)
                 .join(lbp_runs)
                 .set { convert_my_labels_to_img }

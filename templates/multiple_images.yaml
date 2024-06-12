@@ -16,12 +16,14 @@ args:
     ncpus: 30
     outfile_name: 'lbp_result.npy'
     img_name: 'lbp_result'
-  umap:
+  dimred:
+    method: umap # [umap, pca, tsne]
     n_components: 20
     n_neighbors: 20
     min_dist: 0.0
     random_state: 42
-  hdbscan:
+  clustering:
+    method: hdbscan # [hdbscan, k_means]
     min_samples: 1
     min_cluster_size: 300
     cluster_selection_epsilon: 0.0

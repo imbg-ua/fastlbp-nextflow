@@ -334,8 +334,6 @@ workflow SingleImage {
         hdbscan_combinations = createCombinations(params.args.clustering)
     }
 
-    hdbscan_combinations.view() // DEBUG
-
     // generate output dir names for each combination of parameters
     lbp_combinations
         .map { it -> 
