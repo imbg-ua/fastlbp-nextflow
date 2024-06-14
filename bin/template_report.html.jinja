@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="fastLBP pipeline run report">
+    <meta name="author" content="Dmytro Horyslavets, IMBG, Kyiv, Ukraine">
+
+    <title>fastLBP Pipeline Run Report</title>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="mb-4">Pipeline Runs</h1>
+        <!-- TODO: make this more pleasing to the eye :) -->
+        <!-- runs_info_list = [{hash: ..., dimred_html: ..., patchimg_html: ..., parameters_dict: ...}, {...}, ...] -->
+        <h2>Image</h2>
+        <div class="container">
+        <div class="row">
+            <div class="col-sm">
+            {{ img | safe }}
+            </div>
+            {% if annot != None %}
+            <div class="col-sm">
+            {{ annot | safe }}
+            </div>
+            {% endif %}
+        </div>
+        </div>
+        {% for run_dict in runs_info_list %}
+        <h2>Run {{ run_dict["hash"] }}</h2>
+
+        {% for step_params in run_dict["parameters_list_of_dicts"] %}
+        <dl class="row small">
+        {% for key in step_params %}
+        <dt class="col-sm-3">{{ key }}</dt>
+        <dd class="col-sm-9"><samp>{{ step_params[key] }}</samp></dd>
+        {% endfor %}
+        </dl>
+        <hr />
+        {% endfor %}
+
+        <div class="container">
+        <div class="row">
+            <div class="col-sm">
+            {{ run_dict["dimred_html"] | safe }}
+            </div>
+            <div class="col-sm">
+            {{ run_dict["patchimg_html"] | safe }}
+            </div>
+        </div>
+        </div>
+        {% endfor %}
+    </div>
+    <!-- jQuery, Popper.js, and Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"></script>
+</body>
+</html>

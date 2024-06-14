@@ -288,6 +288,29 @@ process labels_to_patch_img {
     """
 }
 
+process generate_report {
+    debug debug_flag
+    tag "wrapping up"
+    publishDir "${params.outdir}", mode: "copy"
+
+    input:
+    tuple path(img), path(annot), path(outdir)
+
+    output:
+    path(html_report)
+
+    script:
+    html_report = "report.html"
+    annot_path = annot ? "--annot_path ${annot}" : ""
+    """
+    generate_report.py \
+        --outdir ${outdir} \
+        --img_path ${img} \
+        ${annot_path} \
+        --savefile ${html_report}
+    """
+}
+
 // TODO: implement repeating parts as subworkflows
 workflow SingleImage {
 
@@ -432,6 +455,12 @@ workflow SingleImage {
         
         combinations_metadata_to_tsv(combinations_metadata)
 
+        combinations_metadata_to_tsv.out.collect()
+            .map { tuple(params.img_path, [], params.outdir) }
+            .set { data_for_report }
+
+        generate_report(data_for_report)
+
     } else if ( params.mask == "auto" ) {
 
         info_log("Otsu mask mode")
@@ -440,6 +469,12 @@ workflow SingleImage {
 
         get_tissue_mask.out
             .set { pixel_mask_ch }
+
+        get_tissue_mask.out
+            .map { imgg, pixelmask ->
+            pixelmask }
+            .toList()
+            .set { mask_for_report }
 
         get_tissue_mask.out
             .combine(lbp_combinations_hash_outdir)
@@ -533,6 +568,18 @@ workflow SingleImage {
             .set { combinations_metadata }
         
         combinations_metadata_to_tsv(combinations_metadata)
+
+        combinations_metadata_to_tsv.out.collect()
+            .map { tuple(params.img_path, params.outdir) }
+            .set { data_for_report }
+
+        data_for_report
+            .combine(mask_for_report)
+            .map { imgg, outdirr, maskk ->
+            tuple(imgg, maskk, outdirr) }
+            .set { data_for_report_auto_mask }
+
+        generate_report(data_for_report_auto_mask)
 
     } else {
 
@@ -631,6 +678,7 @@ workflow SingleImage {
             tuple("${params.outdir}/${params_hash}", step_dataa) }
             .set { dirs_and_data_to_save }
 
+
         copy_files_to_target_dir(dirs_and_data_to_save)
 
         final_data_and_folders.dir_and_hash
@@ -638,6 +686,12 @@ workflow SingleImage {
             .set { combinations_metadata }
         
         combinations_metadata_to_tsv(combinations_metadata)
+
+        combinations_metadata_to_tsv.out.collect()
+            .map { tuple(params.img_path, [], params.outdir) }
+            .set { data_for_report }
+
+        generate_report(data_for_report)
 
     }
 }
