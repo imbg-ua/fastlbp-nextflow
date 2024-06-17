@@ -2,6 +2,8 @@
 
 nextflow.enable.dsl = 2
 
+pipeline_version = "0.0.0"
+
 // Default params
 params.background_color = ""
 
