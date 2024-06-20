@@ -2,6 +2,7 @@
 
 import hdbscan
 from sklearn.cluster import KMeans, AffinityPropagation
+from sklearn.mixture import GaussianMixture
 import fire
 import numpy as np
 import workflow_utils as ut
@@ -20,7 +21,6 @@ def run_hdbscan(
     hdbscan_labels = hdbscan.HDBSCAN(min_samples=min_samples, min_cluster_size=min_cluster_size, **kwargs).fit_predict(data)
     np.save(savefile, hdbscan_labels)
 
-
 def run_kmeans(
     np_data_path: str, 
     savefile: str='clustering_labels.npy', 
@@ -35,7 +35,15 @@ def run_affinity_propagation(
     **kwargs) -> None:
     data = np.load(np_data_path)
     affprop_labels = AffinityPropagation(**kwargs).fit_predict(data)
-    np.save(savefile, affprop_labels)    
+    np.save(savefile, affprop_labels)
+
+def run_gaussian_mixture(
+    np_data_path: str, 
+    savefile: str='clustering_labels.npy', 
+    **kwargs) -> None:
+    data = np.load(np_data_path)
+    gauss_mix_labels = GaussianMixture(**kwargs).fit_predict(data)
+    np.save(savefile, gauss_mix_labels)
     
 def run_leiden(
     np_data_path: str, 
@@ -66,6 +74,9 @@ def main(np_data_path: str, params_str: str) -> None:
     elif method == 'affinity_propagation':
         run_affinity_propagation(np_data_path=np_data_path, 
                                  **params_dict)
+    elif method == 'gaussian_mixture':
+        run_gaussian_mixture(np_data_path=np_data_path, 
+                             **params_dict)
     else:
         raise ValueError(f'Clustering method \"{method}\" is not a valid option.')
 
