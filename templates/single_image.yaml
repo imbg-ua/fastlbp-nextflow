@@ -11,6 +11,7 @@ background_color: [255, 255, 255] # default is 0
 
 # --- specify parameters to test --- #
 args:
+
   lbp:
     patchsize: 242
     radii: [1,2,3,4,5] # don't specify to automatically calculate radii according to the default scheme
@@ -18,23 +19,47 @@ args:
     ncpus: 30
     outfile_name: 'lbp_result.npy'
     img_name: 'lbp_result'
+    
   dimred:
-    method: pca # [umap, pca, tsne]
+    method: pca
     n_components: 20
-    # n_neighbors: 20
-    # min_dist: 0.0
     random_state: 42
+    
+#     method: umap
+#     n_components: 20
+#     n_neighbors: 20
+#     min_dist: 0.0
+#     random_state: 42
+    
+#     method: tsne
+#     # TODO add params here
+    
   clustering:
-    method: gaussian_mixture # [hdbscan, k_means, affinity_propagation]
-    n_components: 4
-    covariance_type: 'diag'
-    tol: 0.005
-    random_state: 42
-    # damping: 0.7
-    # random_state: 42
+    # method: hdbscan
     # min_samples: 1
     # min_cluster_size: 300
     # cluster_selection_epsilon: 0.0
     # gen_min_span_tree: True
+    
+    # method: k_means
+    # n_clusters: 4
+    # random_state: 42
+    
+    # method: affinity_propagation
+    # damping: 0.7
+    # random_state: 42
+    
+    method: gaussian_mixture
+    n_components: 4
+    covariance_type: 'diag'
+    tol: 0.005
+    random_state: 42
+    
+    # method: leiden
+    # # TODO add params here
+    
+    
+
+    
 
     
