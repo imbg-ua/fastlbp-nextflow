@@ -10,7 +10,8 @@ import os
 import workflow_utils as ut
 
 
-def dimred_2D_html(dimred_path: str, labels_path: str, component_1: int=0, component_2: int=1) -> str:
+def dimred_2D_html(dimred_path: str, labels_path: str, component_1: int=0, component_2: int=1,
+                   include_plotlyjs: str | bool = 'cdn') -> str:
     dimred = np.load(dimred_path)
     labels = np.load(labels_path)
 
@@ -18,25 +19,25 @@ def dimred_2D_html(dimred_path: str, labels_path: str, component_1: int=0, compo
 
     fig = plot_dimred_2D_labelled(data)
 
-    plot_html = fig.to_html(full_html = False)
+    plot_html = fig.to_html(full_html = False, include_plotlyjs=include_plotlyjs)
 
     return plot_html
 
-def img_html(img_path: str) -> str:
+def img_html(img_path: str, include_plotlyjs: str | bool = 'cdn') -> str:
     img = ut.read_img(img_path)
 
     fig = plot_img(img)
 
-    plot_html = fig.to_html(full_html = False)
+    plot_html = fig.to_html(full_html = False, include_plotlyjs=include_plotlyjs)
 
     return plot_html
 
-def img_downscaled_html(img_path: str, size=(400, 400)) -> str:
+def img_downscaled_html(img_path: str, size=(400, 400), include_plotlyjs: str | bool = 'cdn') -> str:
     img = ut.read_img(img_path)
 
     fig = plot_img_downscaled(img, size)
 
-    plot_html = fig.to_html(full_html = False)
+    plot_html = fig.to_html(full_html = False, include_plotlyjs=include_plotlyjs)
 
     return plot_html
 
