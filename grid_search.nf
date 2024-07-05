@@ -187,6 +187,7 @@ process get_tissue_mask {
 
 process downscale_mask {
     debug debug_flag
+    tag "preprocessing"
     // publishDir "${step_outdir}", mode: "copy"
 
     input:
@@ -207,6 +208,7 @@ process downscale_mask {
 
 process fastlbp {
     debug debug_flag
+    tag "fastlbp"
     // publishDir "${step_outdir}", mode: "copy"
 
     input:
@@ -272,6 +274,7 @@ process clustering {
 
 process labels_to_patch_img {
     debug debug_flag
+    tag "generating segmented image"
     // publishDir "${step_outdir}", mode: "copy"
 
     input:

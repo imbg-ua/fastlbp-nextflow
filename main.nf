@@ -25,6 +25,7 @@ def extract_patchsize_from_lbp_params_list(lbp_params_list) {
     res[1]
 }
 
+// TODO: update to new config format (as used in grid_search.nf)
 def params_args_list = params.args.collect { k, v -> [k, v] }
 
 def lbp_params = params.args.lbp.collect { k, v -> [k, v] }
