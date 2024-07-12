@@ -58,9 +58,6 @@ def run_leiden(
     lied_clust = ad.obs['leiden']
     leid_clust = np.array([int(x) for x in lied_clust])
     np.save(savefile, leid_clust)
-    # probably need to use scanpy.tl.leiden
-    # for that I have to convert the data into an AnnData object
-    # raise ValueError("Leiden clustering is not implemented yet.")
 
 def main(np_data_path: str, params_str: str) -> None:
     params_dict = ut.parse_params_str(params_str)

@@ -1,9 +1,12 @@
+# TODO: make the templates clean
+# TOOD: describe available methods in documentation instead
+
 # --- set img path and savedir --- #
-img_path: '/nfs/lbp_project/Thymus_test/TA11486161/spatial/otsu/img_white_bg.npy'
-outdir: '/lustre/scratch126/casm/team268im/os9/LBP/fastlbp-nextflow/gaus_mixt_test'
+img_path: '/path/to/image'
+outdir: '/path/to/outdir'
 
 # --- choose from the following or leave blank to not use the mask --- #
-mask: '/nfs/lbp_project/Thymus_test/TA11486161/spatial/otsu/mask.npy'
+mask: '/path/to/mask'
 background_color: [255, 255, 255] # default is 0 
 
 # mask: auto
@@ -11,30 +14,36 @@ background_color: [255, 255, 255] # default is 0
 
 # --- specify parameters to test --- #
 args:
-
   lbp:
     patchsize: 242
-    radii: [1,2,3,4,5] # don't specify to automatically calculate radii according to the default scheme
-    npoints: [7,13,19,26,32] # don't specify to automatically calculate number of points for each radius
+    # don't specify to automatically calculate radii according to the default scheme
+    radii: [1, 2, 3, 4, 5]
+    # don't specify to automatically calculate number of points for each radius
+    npoints: [7, 13, 19, 26, 32]
     ncpus: 30
     outfile_name: 'lbp_result.npy'
     img_name: 'lbp_result'
-    
   dimred:
     method: pca
     n_components: 20
     random_state: 42
+
+    # method: umap
+    # n_components: 20
+    # n_neighbors: 20
+    # min_dist: 0.0
+    # random_state: 42
     
-#     method: umap
-#     n_components: 20
-#     n_neighbors: 20
-#     min_dist: 0.0
-#     random_state: 42
-    
-#     method: tsne
-#     # TODO add params here
+    # # TODO add params here
+    # method: tsne
     
   clustering:
+    method: gaussian_mixture
+    n_components: 4
+    covariance_type: 'diag'
+    tol: 0.005
+    random_state: 42
+
     # method: hdbscan
     # min_samples: 1
     # min_cluster_size: 300
@@ -49,17 +58,5 @@ args:
     # damping: 0.7
     # random_state: 42
     
-    method: gaussian_mixture
-    n_components: 4
-    covariance_type: 'diag'
-    tol: 0.005
-    random_state: 42
-    
-    # method: leiden
     # # TODO add params here
-    
-    
-
-    
-
-    
+    # method: leiden
