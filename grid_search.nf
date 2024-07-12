@@ -25,6 +25,7 @@ def extract_patchsize_from_lbp_params_list(lbp_params_list) {
 }
 
 // TODO: refactor
+// BUG: works incorrectly with string parameters
 def createCombinations(method_params) {
     // total number of parameters for the method
     def method_params_num = method_params.size()
@@ -186,6 +187,7 @@ process get_tissue_mask {
 
 process downscale_mask {
     debug debug_flag
+    tag "preprocessing"
     // publishDir "${step_outdir}", mode: "copy"
 
     input:
@@ -206,6 +208,7 @@ process downscale_mask {
 
 process fastlbp {
     debug debug_flag
+    tag "fastlbp"
     // publishDir "${step_outdir}", mode: "copy"
 
     input:
@@ -271,6 +274,7 @@ process clustering {
 
 process labels_to_patch_img {
     debug debug_flag
+    tag "generating segmented image"
     // publishDir "${step_outdir}", mode: "copy"
 
     input:
@@ -636,6 +640,7 @@ workflow SingleImage {
             .combine(hdbscan_combinations_hash_outdir)
             .map { umap_outdir, umap_embeddings, hdbscan_params_str, hdbscan_params ->
             tuple("${umap_outdir}/${hdbscan_params_str}", umap_embeddings, hdbscan_params) }
+            .unique() // FIXME: not optimal hotfix
             .set { feed_me_into_hdbscan }
 
         clustering(feed_me_into_hdbscan)
@@ -690,7 +695,7 @@ workflow SingleImage {
         combinations_metadata_to_tsv(combinations_metadata)
 
         combinations_metadata_to_tsv.out.collect()
-            .map { tuple(params.img_path, [], params.outdir) }
+            .map { tuple(params.img_path, params.mask, params.outdir) }
             .set { data_for_report }
 
         generate_report(data_for_report)
