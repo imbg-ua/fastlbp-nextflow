@@ -1,4 +1,4 @@
-name: dimas_env
+name: environment
 channels:
   - plotly
   - anaconda
@@ -120,4 +120,3 @@ dependencies:
       - umap-learn==0.5.5
       - wcwidth==0.2.12
       - zarr==2.16.1
-prefix: /lustre/scratch126/casm/team268im/os9/conda/envs/dimas_env

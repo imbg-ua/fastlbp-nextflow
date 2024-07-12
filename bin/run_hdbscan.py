@@ -83,9 +83,6 @@ def main(np_data_path: str, params_str: str) -> None:
     elif method == 'gaussian_mixture':
         run_gaussian_mixture(np_data_path=np_data_path, 
                              **params_dict)
-    elif method == 'leiden':
-        run_leiden(np_data_path=np_data_path, 
-                   **params_dict)
     else:
         raise ValueError(f'Clustering method \"{method}\" is not a valid option.')
 
