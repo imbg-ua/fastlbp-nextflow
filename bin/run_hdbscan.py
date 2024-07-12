@@ -52,7 +52,7 @@ def run_leiden(
     savefile: str='clustering_labels.npy', 
     **kwargs) -> None:
     data = np.load(np_data_path)
-    ad = adata.AnnData(X=embeddings)
+    ad = adata.AnnData(X=data)
     sc.pp.neighbors(ad, n_neighbors=10, use_rep='X')
     sc.tl.leiden(ad, resolution=1.0)
     lied_clust = ad.obs['leiden']
