@@ -3,6 +3,8 @@
 import hdbscan
 from sklearn.cluster import KMeans, AffinityPropagation
 from sklearn.mixture import GaussianMixture
+import anndata as adata
+import scanpy as sc
 import fire
 import numpy as np
 import workflow_utils as ut
@@ -49,9 +51,16 @@ def run_leiden(
     np_data_path: str, 
     savefile: str='clustering_labels.npy', 
     **kwargs) -> None:
+    data = np.load(np_data_path)
+    ad = adata.AnnData(X=embeddings)
+    sc.pp.neighbors(ad, n_neighbors=10, use_rep='X')
+    sc.tl.leiden(ad, resolution=1.0)
+    lied_clust = ad.obs['leiden']
+    leid_clust = np.array([int(x) for x in lied_clust])
+    np.save(savefile, leid_clust)
     # probably need to use scanpy.tl.leiden
     # for that I have to convert the data into an AnnData object
-    raise ValueError("Leiden clustering is not implemented yet.")
+    # raise ValueError("Leiden clustering is not implemented yet.")
 
 def main(np_data_path: str, params_str: str) -> None:
     params_dict = ut.parse_params_str(params_str)
@@ -77,6 +86,9 @@ def main(np_data_path: str, params_str: str) -> None:
     elif method == 'gaussian_mixture':
         run_gaussian_mixture(np_data_path=np_data_path, 
                              **params_dict)
+    elif method == 'leiden':
+        run_leiden(np_data_path=np_data_path, 
+                   **params_dict)
     else:
         raise ValueError(f'Clustering method \"{method}\" is not a valid option.')
 
