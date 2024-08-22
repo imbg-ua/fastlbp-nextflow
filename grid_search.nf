@@ -294,6 +294,30 @@ process labels_to_patch_img {
     """
 }
 
+process calculate_unsupervised_clustering_score {
+    debug debug_flag
+    tag "calculating performance metrics"
+    // publishDir "${step_outdir}", mode: "copy"
+
+    input:
+    tuple val(step_outdir), path(annot), path(patch_img)
+
+    output:
+    tuple val(step_outdir), path(all_pairs_csv), path(pairs_max_csv)
+
+    script:
+    // TODO: fix inconsistent namings
+    all_pairs_csv = 'all_pairs_jacc.csv'
+    pairs_max_csv = 'pairs_max_jacc.csv'
+    """
+    calculate_unsupervised_metrics.py \
+        --patch_img_path ${patch_img} \
+        --annotation_path ${annot} \
+        --savefile_all_pairs ${all_pairs_csv} \
+        --savefile_max_pairs ${pairs_max_csv}
+    """
+}
+
 process generate_report {
     debug debug_flag
     tag "wrapping up"
@@ -308,11 +332,15 @@ process generate_report {
     script:
     html_report = "report.html"
     annot_path = annot ? "--annot_path ${annot}" : ""
+    integer_annot_path = params.integer_annot_path ? "--integer_annot_path ${params.integer_annot_path}" : ""
+    annot_legend_path = params.annot_legend_path ? "--annot_legend_path ${params.annot_legend_path}" : "" // TODO: use as input?
     """
     generate_report.py \
         --outdir ${outdir} \
         --img_path ${img} \
         ${annot_path} \
+        ${integer_annot_path} \
+        ${annot_legend_path} \
         --savefile ${html_report}
     """
 }
@@ -589,7 +617,7 @@ workflow SingleImage {
 
     } else {
 
-        info_log("Provided mask mode")
+        info_log("Mask/annotations mode")
 
         convert_to_binmask_ch = Channel.of([params.img_path, params.mask, 
         params.background_color])
@@ -663,19 +691,32 @@ workflow SingleImage {
 
         labels_to_patch_img.out
             .set { all_deconvolves_images_outputs }
+        
+        // Calculate Jaccard scores for runs with respect to annotations
+        // and do cluster matching in a greedy fashion
+        all_deconvolves_images_outputs
+            .map { patch_img_outdir, patch_img ->
+            tuple(patch_img_outdir, params.integer_annot, patch_img) }
+            .set { runs_to_calculate_eval_metric }
+
+        calculate_unsupervised_clustering_score(runs_to_calculate_eval_metric)
+        calculate_unsupervised_clustering_score.out
+            .set { calculated_metrics_outputs }
 
         all_downscale_outputs
             .combine(all_lbp_outputs)
             .combine(all_umap_outputs)
             .combine(all_hdbscan_outputs)
             .combine(all_deconvolves_images_outputs)
-            .filter { it[2].contains(it[0]) && it[4].contains(it[2]) && 
-            it[6].contains(it[4]) && it[8].contains(it[6]) } // as there is additional step as compared to no mask 
+            .combine(calculated_metrics_outputs)
+            .filter { it[2].contains(it[0]) && it[4].contains(it[2]) && // TODO: don't embarass yourself with this
+            it[6].contains(it[4]) && it[8].contains(it[6]) && it[10].contains(it[8])} // as there are additional steps as compared to no mask 
+            // .view()
             .multiMap { downscale_outdirr, downscale_dataa, lbp_outdirr, lbp_dataa, umap_outdirr, umap_dataa, hdbscan_outdirr, hdbscan_dataa, 
-            deconvolve_outdirr, deconvolve_dataa ->
+            deconvolve_outdirr, deconvolve_dataa, metrics_outdirr, metrics_all_pairs_dataa, metrics_max_pairs_data ->
             // replace commas with semicolons to distinguish between inner parameters list and
             // outer combination-to-hash list 
-            data_to_save: tuple(deconvolve_outdirr.replaceAll(",", ";").md5(), tuple(downscale_dataa, lbp_dataa, umap_dataa, hdbscan_dataa, deconvolve_dataa))
+            data_to_save: tuple(deconvolve_outdirr.replaceAll(",", ";").md5(), tuple(downscale_dataa, lbp_dataa, umap_dataa, hdbscan_dataa, deconvolve_dataa, metrics_all_pairs_dataa, metrics_max_pairs_data))
             dir_and_hash: tuple(deconvolve_outdirr.replaceAll(",", ";"), deconvolve_outdirr.replaceAll(",", ";").md5()) }
             .set { final_data_and_folders }
 
