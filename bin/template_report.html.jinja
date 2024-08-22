@@ -17,16 +17,22 @@
         <h2>Image</h2>
         <div class="container">
         <div class="row">
-            <div class="col-sm">
+            <div class="col-sm-6">
             {{ img | safe }}
             </div>
             {% if annot != None %}
-            <div class="col-sm">
+            <div class="col-sm-6">
             {{ annot | safe }}
             </div>
             {% endif %}
         </div>
         </div>
+
+        <h2>Grid View Summary</h2>
+        <div class="container d-flex justify-content-center align-items-center">
+        {{ jaccard_grid | safe }}
+        </div>
+
         {% for run_dict in runs_info_list %}
         <h2>Run {{ run_dict["hash"] }}</h2>
 
@@ -56,5 +62,7 @@
     <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"></script>
+
+
 </body>
 </html>

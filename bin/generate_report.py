@@ -63,13 +63,16 @@ def process_outdir(outdir: str, metadata_tsv: str='hash_to_combination.tsv') -> 
     runs_info['patchimg_html'] = runs_info.apply(lambda dat: pt.img_html(dat.patch_img), axis=1)
 
     # TODO: hardcoded values
-    essential_info = runs_info[['hash', 'dimred_html', 'patchimg_html', 'parameters_list_of_dicts']]
+    # essential_info = runs_info[['hash', 'dimred_html', 'patchimg_html', 'parameters_list_of_dicts']]
 
-    return essential_info
+    return runs_info
 
 
 def render_template(img_path: str, runs_info: pd.DataFrame,
-                    annot_path: str='', template: str='template_report.html.jinja') -> str:
+                    annot_path: str='', integer_annot_path: str='', 
+                    annot_legend_path: str='', 
+                    plots_mpl_cmap: str='omer_colours',
+                    template: str='template_report.html.jinja') -> str:
     pipeline_bin_dir = os.path.dirname(os.path.abspath(__file__))
     template_abs_path = os.path.join(pipeline_bin_dir, template)
 
@@ -84,10 +87,22 @@ def render_template(img_path: str, runs_info: pd.DataFrame,
     annot = None
     if annot_path:
         annot = pt.img_downscaled_html(annot_path)
-    
-    runs_info_list = list(runs_info.T.to_dict().values())
 
-    html_out = template.render(img=img, annot=annot, runs_info_list=runs_info_list)
+    clustering_info = runs_info[['hash', 'dimred_html', 'patchimg_html', 'parameters_list_of_dicts']]
+    clustering_info_list = list(clustering_info.T.to_dict().values())
+
+    # create summary grid with Jaccard scores
+    int_annot_legend = pt.get_allen_brain_int_annot_legend(annot_legend_path) # TODO: make versatile
+    df_hash_and_patch_imgs = runs_info[['hash', 'patch_img']] # TODO: make versatile, get rid of hardcoded values
+    jaccard_grid = pt.plot_jaccard_grid(img_path, integer_annot_path, 
+                                        int_annot_legend, df_hash_and_patch_imgs, 
+                                        cmap=plots_mpl_cmap)
+    jaccard_grid_html = pt.mpl_figure_to_html(jaccard_grid)
+
+    html_out = template.render(img=img, annot=annot, 
+                               jaccard_grid=jaccard_grid_html, runs_info_list=clustering_info_list)
+
+    # html_out = template.render(img=img, annot=annot, runs_info_list=runs_info_list)
 
     return html_out
 
@@ -96,11 +111,18 @@ def render_template(img_path: str, runs_info: pd.DataFrame,
 def create_report(outdir: str, img_path: str, 
                   metadata_tsv: str='hash_to_combination.tsv',
                   annot_path: str='', 
+                  integer_annot_path: str='',
+                  annot_legend_path: str='',
                   template: str='template_report.html.jinja',
+                  plots_mpl_cmap: str='omer_colours',
                   savefile: str='report.html') -> None:
     
     runs_info = process_outdir(outdir, metadata_tsv)
-    report_html = render_template(img_path, runs_info, annot_path, template)
+    report_html = render_template(img_path=img_path, runs_info=runs_info, 
+                                  annot_path=annot_path, integer_annot_path=integer_annot_path, 
+                                  annot_legend_path=annot_legend_path, 
+                                  plots_mpl_cmap=plots_mpl_cmap,
+                                  template=template)
 
     with open(savefile, 'w') as f:
         f.write(report_html)
