@@ -165,9 +165,7 @@ def get_allen_brain_rgb_annot_legend(allen_brain_csv_metadata: str) -> dict:
     return dict(zip(dat.color_indices, dat.region_names))
 
 
-# TODO: add to the report
 # TODO: add subfigures
-# 22 Aug 2024
 def plot_jaccard_grid(img_path: str, annot_path: str, annot_legend_dict: dict, df_to_plot: pd.DataFrame,
                       fig_width: int=15, cmap: str | mpl.colors.Colormap = 'viridis'):
     """
@@ -178,10 +176,12 @@ def plot_jaccard_grid(img_path: str, annot_path: str, annot_legend_dict: dict, d
     annot = ut.read_img(annot_path)
 
     # found experimentally, can't help but use a magic number
-    PRETTY_HEIGH_TO_WIDTH_RATIO = 40 / len(df_to_plot) 
+    PRETTY_HEIGH_TO_WIDTH_RATIO = 45 / len(df_to_plot) 
     
-    fig, axs = plt.subplots(nrows=len(df_to_plot), ncols=4, figsize=(fig_width, fig_width * PRETTY_HEIGH_TO_WIDTH_RATIO)) # img, annot, clustering result, individual classes when their amount is fixed
-    
+    # fig, axs = plt.subplots(nrows=len(df_to_plot), ncols=4, figsize=(fig_width, fig_width * PRETTY_HEIGH_TO_WIDTH_RATIO)) # img, annot, clustering result, individual classes when their amount is fixed
+    fig = plt.figure(figsize=(fig_width, fig_width * PRETTY_HEIGH_TO_WIDTH_RATIO), constrained_layout=True)
+    subfigs = fig.subfigures(nrows=len(df_to_plot), ncols=1, hspace=.11)
+
     clustering_result = df_to_plot.patch_img
     run_hash = df_to_plot.hash
     
@@ -190,20 +190,45 @@ def plot_jaccard_grid(img_path: str, annot_path: str, annot_legend_dict: dict, d
     annot_max = np.max(annot_values)
 
     if isinstance(cmap, str):
-        # cmap_annot = plt.get_cmap(cmap, annot_max - annot_min + 1)
-        print(f'{cmap = } {type(cmap) = } DEBUG')
         cmap_by_key = get_preconstructed_cmap(cmap)
-        print(f'{type(cmap_by_key) = } DEBUG')
         cmap_annot = cmap_by_key.resampled(annot_max - annot_min + 1)
     elif isinstance(cmap, mpl.colors.Colormap):
         cmap_annot = cmap.resampled(annot_max - annot_min + 1)
     
     # TODO: make modular and flexible
-    for idx, axs_row in enumerate(axs):
+
+    for idx, subfig in enumerate(subfigs):
+
+        subfig.suptitle(f'Run {run_hash[idx]}', fontsize='x-large')
+        axs_row = subfig.subplots(nrows=1, ncols=4)
+
         clustering_result_img = ut.read_img(clustering_result[idx])
+
+        # remap cluster labels to match ground truth based on Jaccard scores
+        run_outdir = os.path.dirname(clustering_result[idx])
+        max_pairwise_jacc_csv = os.path.join(run_outdir, 'pairs_max_jacc.csv') # TODO: parameterise
+        labels_remapping_dict = ut.get_class_remapping(max_pairwise_jacc_csv)
+        clustering_result_img = ut.remap_patchimg(clustering_result_img, labels_remapping_dict)
+
+        # remapping done
+
+        # highlight class with the largest matching score
+        labels_remapping_list_sorted = sorted(list(labels_remapping_dict.values()), 
+                                              key=lambda x: x[1], reverse=True)
+        largest_class, largest_jacc_score = labels_remapping_list_sorted[0]
+
+        largest_class_img = np.zeros(shape=(clustering_result_img.shape[0], clustering_result_img.shape[1]), 
+                                     dtype=np.bool_)
+
+        largest_class_mask = clustering_result_img == int(largest_class)
+        largest_class_img[largest_class_mask] = True
+
+        # hightlighting done
+       
+
         axs_row[0].imshow(img)
         axs_row[0].axis("off")
-        axs_row[0].set_title(f'Sample\n<img_id>')
+        axs_row[0].set_title(f'Image')
     
         ax1 = axs_row[1].imshow(annot, cmap=cmap_annot, vmin=annot_min - 0.5, 
                                 vmax=annot_max + 0.5)
@@ -212,14 +237,8 @@ def plot_jaccard_grid(img_path: str, annot_path: str, annot_legend_dict: dict, d
         
         # add metadata legend for annotations
         annot_colors = [ax1.cmap(ax1.norm(annot_value)) for annot_value in annot_values]
-        print(f'{annot_legend_dict = } DEBUG DEBUG DEBUG\n{annot_values = }\nDEBUG DEBUG DEBUG')
         patches = [mpatches.Patch(color=annot_colors[i], label=f'{annot_values[i]} - {annot_legend_dict[i]}') for i in range(len(annot_values))]
         axs_row[1].legend(handles=patches, bbox_to_anchor=(1, 1), loc='best', borderaxespad=0, framealpha=0.6)
-        
-        # # add discrete colobar (optional)
-        # divider = make_axes_locatable(axs_row[1])
-        # cax = divider.append_axes('right', size='5%', pad=0.05)
-        # fig.colorbar(ax1, cax=cax, orientation='vertical')
 
         clustering_result_unique = np.unique(clustering_result_img.ravel())
         clustering_result_max = np.max(clustering_result_unique)
@@ -235,18 +254,16 @@ def plot_jaccard_grid(img_path: str, annot_path: str, annot_legend_dict: dict, d
         ax2 = axs_row[2].imshow(clustering_result_img, cmap=cmap_clustering, vmin=clustering_result_min - 0.5, 
                                 vmax=clustering_result_max + 0.5)
         axs_row[2].axis("off")
-        axs_row[2].set_title(f'Unsupervised Prediction')
+        axs_row[2].set_title(f'Unsupervised Clustering')
 
         divider = make_axes_locatable(axs_row[2])
         cax = divider.append_axes('right', size='5%', pad=0.05)
         fig.colorbar(ax2, cax=cax, ticks=np.arange(clustering_result_min, clustering_result_max + 1),
                        orientation='vertical', pad=.1, fraction=0.05)
 
-        axs_row[3].imshow(clustering_result_img)
+        axs_row[3].imshow(largest_class_img, cmap=cmap_clustering)
         axs_row[3].axis("off")
-        axs_row[3].set_title(f'Best matching cluster <1>\nMax Jaccard: 0.2')
-    
-    plt.tight_layout()
+        axs_row[3].set_title(f'Best matching cluster {largest_class}\nJaccard: {largest_jacc_score}') # this is a placeholder
 
     return fig
 
@@ -261,8 +278,6 @@ def base64img_to_html(encoded_img: bytes) -> str:
 
 def mpl_figure_to_html(fig: mpl.figure.Figure) -> str:
     return base64img_to_html(mpl_figure_to_base64(fig))
-
-# def get_jaccard_grid(run_outdir: str,) -> mpl.figure.Figure:
 
 def main():
     pass

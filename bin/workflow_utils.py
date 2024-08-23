@@ -194,5 +194,33 @@ def run_paiwise_max_jacc(gt_path: str,
     df_max.to_csv(savefile_max_pairs) # max parwise Jacc df is saved here
 
 
+# === Unsupervised labels remapping utils === #
+
+def get_class_remapping(pairs_max_jaccard_csv_path: str) -> dict:
+    """Return dict pred to true class labels.
+    """
+    dat = pd.read_csv(pairs_max_jaccard_csv_path)
+    dat = dat[['gt', 'pd', 'max_Jacc']] # TODO: remove hardcoded values
+    res = dict()
+    for _, row in dat.iterrows():
+        true = row['gt'].split('_')[-1]
+        pred = row['pd'].split('_')[-1]
+        res[pred] = (true, row['max_Jacc'])
+    return res
+
+def remap_patchimg(patch_img: np.ndarray, class_remapping_dict: dict) -> np.ndarray:
+    """Remap predicted labels based on highest Jacard score with the annotations (ground truth).
+    """
+    res = np.zeros(shape=(patch_img.shape[0], patch_img.shape[1]), dtype=patch_img.dtype)
+    class_vals = np.unique(patch_img.ravel())
+    
+    for class_val in class_vals:
+        if str(class_val) not in class_remapping_dict:
+            # skip labels that didn't get into the csv with the largest Jaccard scores between classes 
+            continue
+        class_mask = patch_img == class_val
+        res[class_mask] = int(class_remapping_dict[str(class_val)][0])
+    return res
+
 if __name__ == '__main__':
     fire.Fire()
