@@ -186,6 +186,7 @@ def plot_jaccard_grid(img_path: str, annot_path: str, annot_legend_dict: dict, d
     run_hash = df_to_plot.hash
     
     annot_values = np.unique(annot.ravel())
+    num_annot_values = len(annot_values)
     annot_min = np.min(annot_values)
     annot_max = np.max(annot_values)
 
@@ -203,6 +204,7 @@ def plot_jaccard_grid(img_path: str, annot_path: str, annot_legend_dict: dict, d
         axs_row = subfig.subplots(nrows=1, ncols=4)
 
         clustering_result_img = ut.read_img(clustering_result[idx])
+        total_num_found_clusters = len(np.unique(clustering_result_img.ravel()))
 
         # remap cluster labels to match ground truth based on Jaccard scores
         run_outdir = os.path.dirname(clustering_result[idx])
@@ -251,10 +253,16 @@ def plot_jaccard_grid(img_path: str, annot_path: str, annot_legend_dict: dict, d
         elif isinstance(cmap, mpl.colors.Colormap):
             cmap_clustering = cmap.resampled(clustering_result_max - clustering_result_min + 1)
 
-        ax2 = axs_row[2].imshow(clustering_result_img, cmap=cmap_clustering, vmin=clustering_result_min - 0.5, 
-                                vmax=clustering_result_max + 0.5)
+        ax2 = axs_row[2].imshow(clustering_result_img, cmap=cmap_annot, vmin=annot_min - 0.5, 
+                                vmax=annot_max + 0.5)
         axs_row[2].axis("off")
-        axs_row[2].set_title(f'Unsupervised Clustering')
+
+        # indicate how many clusters there were before remapping to match annotations
+        num_found_clusters = len(np.unique(clustering_result_img.ravel()))
+        found_less_clusters_than_classes = f'A total of {total_num_found_clusters - 1} clusters were found' # without background
+        found_more_clusters_than_classes = f'Showing top {num_found_clusters - 1} clusters out of {total_num_found_clusters - 1}'
+        unsup_clust_title = found_less_clusters_than_classes if total_num_found_clusters < num_annot_values else found_more_clusters_than_classes
+        axs_row[2].set_title(f'Unsupervised Clustering\n{unsup_clust_title}')
 
         divider = make_axes_locatable(axs_row[2])
         cax = divider.append_axes('right', size='5%', pad=0.05)
@@ -274,6 +282,7 @@ def mpl_figure_to_base64(fig: mpl.figure.Figure) -> bytes:
     return encoded
 
 def base64img_to_html(encoded_img: bytes) -> str:
+    # TODO: remove responsiveness
     return f'<img src=\'data:image/png;base64,{encoded_img}\' class=\"img-fluid\" alt=\"Centered Image\" style=\"max-width: 100%; height: auto;\">'
 
 def mpl_figure_to_html(fig: mpl.figure.Figure) -> str:

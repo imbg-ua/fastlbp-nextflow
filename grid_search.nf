@@ -296,7 +296,7 @@ process labels_to_patch_img {
 
 process calculate_unsupervised_clustering_score {
     debug debug_flag
-    tag "calculating performance metrics"
+    tag "analysis"
     // publishDir "${step_outdir}", mode: "copy"
 
     input:
