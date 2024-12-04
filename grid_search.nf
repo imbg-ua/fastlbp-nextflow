@@ -25,7 +25,20 @@ def extract_patchsize_from_lbp_params_list(lbp_params_list) {
 }
 
 // TODO: refactor
-// BUG: works incorrectly with string parameters
+
+// BUG: works incorrectly with string parameters. 
+// Please always enclose string parameters in square brackets in the config file
+/*
+
+Incorrect:
+metric: euclidean
+
+===
+
+Correct:
+metric: ["euclidean"]
+*/
+
 def createCombinations(method_params) {
     // total number of parameters for the method
     def method_params_num = method_params.size()
@@ -46,17 +59,25 @@ def createCombinations(method_params) {
         def transformParams = { data ->
             def output = data.collectEntries { iit -> [(iit[0]): iit[1]] }
             def res = []
-            output.values()[0].eachWithIndex {_, idx ->
-                def combined_res = []
-                output.each { kk, vv ->
-                    combined_res << kk
-                    if (vv instanceof List)
-                        combined_res << vv[idx]
-                    else
-                        combined_res << vv
+
+            if (output.values()[0] instanceof String) {
+                res << [output.keySet()[0], output.values()[0]]
+            } else {
+
+                output.values()[0].eachWithIndex {sss, idx ->
+                    def combined_res = []
+                    output.each { kk, vv ->
+                        combined_res << kk
+                        if ((vv instanceof List))
+                            combined_res << vv[idx]
+                        else
+                            combined_res << vv
+                    }
+                    res << combined_res
                 }
-                res << combined_res
+
             }
+
 
             return res
         }

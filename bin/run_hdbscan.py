@@ -12,8 +12,8 @@ import workflow_utils as ut
 
 def run_hdbscan(
     np_data_path: str, 
-    min_samples=10, 
-    min_cluster_size=200, 
+    min_samples=1, 
+    min_cluster_size=5, 
     cluster_selection_epsilon=0.0,
     gen_min_span_tree=True,
     savefile: str='clustering_labels.npy', 
