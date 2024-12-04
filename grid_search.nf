@@ -29,7 +29,7 @@ def extract_parameter_val_from_params_list(param_list, parameter_to_extract = 'p
 }
 
 // TODO: refactor
-// BUG: works incorrectly with string parameters
+
 def createCombinations(method_params) {
     // example: 
     /*
