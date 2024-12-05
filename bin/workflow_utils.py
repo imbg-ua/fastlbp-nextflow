@@ -14,6 +14,8 @@ PIL_EXTENSIONS = ('.jpeg', '.jpg', '.png')
 TIFFFILE_EXTENSIONS = ('.tif', '.tiff', '.ndpi')
 NUMPY_EXTENSIONS = ('.npy')
 
+# TODO: add zarr support
+
 def read_img(path: str) -> np.array:
     """
     Generic image reading function.

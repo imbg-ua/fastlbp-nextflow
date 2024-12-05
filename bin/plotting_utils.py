@@ -19,6 +19,8 @@ from copy import deepcopy
 import base64
 from io import BytesIO
 
+from typing import List
+
 
 def dimred_2D_html(dimred_path: str, labels_path: str, component_1: int=0, component_2: int=1,
                    include_plotlyjs: str | bool = 'cdn') -> str:
@@ -156,34 +158,73 @@ def get_preconstructed_cmap(id: str = 'viridis') -> mpl.colors.Colormap:
             return LinearSegmentedColormap.from_list('ben_colorblind_large_cmap', out)
 
 
+def read_annotation_legend(annotation_legend_csv: str, class_value_column: str="id", 
+                          class_name_column: str="name") -> dict:
+    """Read annotation legend from a csv file.
+
+    The csv file **must** contain 2 mandatory columns:
+        - `id` with the integer value of the class
+        - `name` name of the corresponding class
+    
+    Alternatively, you can explicitly specify other names for the `id` and `name` columns using function parameters.
+
+    Parameters
+    ----------
+    annotation_legend_csv : str
+        Path to a csv file with the annotation legend.
+
+    class_value_column : str, default: 'id'
+        Name of the column storing integer values representing 
+        different classes in the annotations. 
+    
+    class_name_column : str, default: 'name'
+        Name of the column storing class names.
+
+    Returns
+    -------
+    result : dict
+        Python dictionary with the annotation legend. 
+        Keys are class integer values, values are names of the classes.
+
+    """
+
+    dat = pd.read_csv(annotation_legend_csv)
+    return dict(zip(dat[class_value_column], dat[class_name_column]))
+    
+# TODO: replace with a generic function `read_annotation_legend`
 def get_allen_brain_int_annot_legend(allen_brain_csv_metadata: str) -> dict:
     dat = pd.read_csv(allen_brain_csv_metadata)
     return dict(zip(dat.color_indices, dat.region_names))
 
+# TODO: delete as not used
 def get_allen_brain_rgb_annot_legend(allen_brain_csv_metadata: str) -> dict:
     dat = pd.read_csv(allen_brain_csv_metadata)
     return dict(zip(dat.color_indices, dat.region_names))
 
+    
 
-# TODO: add subfigures
-def plot_jaccard_grid(img_path: str, annot_path: str, annot_legend_dict: dict, df_to_plot: pd.DataFrame,
+# TODO: add subfigures for each run
+def plot_jaccard_grid(img_path: str, annot_path: str, clustering_imgs: List[str], run_hashes: List[str], annot_legend_dict: dict | None = None,
+                      class_mapping_csv: str='pairs_max_jacc.csv',
                       fig_width: int=15, cmap: str | mpl.colors.Colormap = 'viridis'):
     """
-    Return a summary grid of unsupervised clustering runs ranked by the jaccard score given the ground truth.
+    Return a summary grid of the unsupervised clustering results mapped to annotation with multiple classes. 
+    The runs are ranked by the Jaccard score based on the greedy cluster matching algorithm described in `workflow_utils.py`
     """
+
+    assert len(clustering_imgs) == len(run_hashes), "Length of the array of clustering results doesn't match length of the array of run hashes."
+
+    num_runs = len(run_hashes)
     
     img = ut.read_img(img_path)
     annot = ut.read_img(annot_path)
 
     # found experimentally, can't help but use a magic number
-    PRETTY_HEIGH_TO_WIDTH_RATIO = 45 / len(df_to_plot) 
+    PRETTY_HEIGH_TO_WIDTH_RATIO = 45 / num_runs 
     
-    # fig, axs = plt.subplots(nrows=len(df_to_plot), ncols=4, figsize=(fig_width, fig_width * PRETTY_HEIGH_TO_WIDTH_RATIO)) # img, annot, clustering result, individual classes when their amount is fixed
+    # fig, axs = plt.subplots(nrows=num_runs, ncols=4, figsize=(fig_width, fig_width * PRETTY_HEIGH_TO_WIDTH_RATIO)) # img, annot, clustering result, individual classes when their amount is fixed
     fig = plt.figure(figsize=(fig_width, fig_width * PRETTY_HEIGH_TO_WIDTH_RATIO), constrained_layout=True)
-    subfigs = fig.subfigures(nrows=len(df_to_plot), ncols=1, hspace=.11)
-
-    clustering_result = df_to_plot.patch_img
-    run_hash = df_to_plot.hash
+    subfigs = fig.subfigures(nrows=num_runs, ncols=1, hspace=.11)
     
     annot_values = np.unique(annot.ravel())
     num_annot_values = len(annot_values)
@@ -200,15 +241,16 @@ def plot_jaccard_grid(img_path: str, annot_path: str, annot_legend_dict: dict, d
 
     for idx, subfig in enumerate(subfigs):
 
-        subfig.suptitle(f'Run {run_hash[idx]}', fontsize='x-large')
+        subfig.suptitle(f'Run {run_hashes[idx]}', fontsize='x-large')
         axs_row = subfig.subplots(nrows=1, ncols=4)
 
-        clustering_result_img = ut.read_img(clustering_result[idx])
+        clustering_result_img = ut.read_img(clustering_imgs[idx])
         total_num_found_clusters = len(np.unique(clustering_result_img.ravel()))
 
         # remap cluster labels to match ground truth based on Jaccard scores
-        run_outdir = os.path.dirname(clustering_result[idx])
-        max_pairwise_jacc_csv = os.path.join(run_outdir, 'pairs_max_jacc.csv') # TODO: parameterise
+        run_outdir = os.path.dirname(clustering_imgs[idx])
+
+        max_pairwise_jacc_csv = os.path.join(run_outdir, class_mapping_csv)
         labels_remapping_dict = ut.get_class_remapping(max_pairwise_jacc_csv)
         clustering_result_img = ut.remap_patchimg(clustering_result_img, labels_remapping_dict)
 
@@ -226,7 +268,6 @@ def plot_jaccard_grid(img_path: str, annot_path: str, annot_legend_dict: dict, d
         largest_class_img[largest_class_mask] = True
 
         # hightlighting done
-       
 
         axs_row[0].imshow(img)
         axs_row[0].axis("off")
@@ -239,7 +280,12 @@ def plot_jaccard_grid(img_path: str, annot_path: str, annot_legend_dict: dict, d
         
         # add metadata legend for annotations
         annot_colors = [ax1.cmap(ax1.norm(annot_value)) for annot_value in annot_values]
-        patches = [mpatches.Patch(color=annot_colors[i], label=f'{annot_values[i]} - {annot_legend_dict[i]}') for i in range(len(annot_values))]
+        if annot_legend_dict:
+            # TODO: add dict key type check or choose a dtype to cast to in read_annotation_legend()
+            patches = [mpatches.Patch(color=annot_colors[i], label=f'{annot_values[i]} - {annot_legend_dict[annot_values[i]]}') for i in range(len(annot_values))]
+        else:
+            patches = [mpatches.Patch(color=annot_colors[i], label=f'Class {annot_values[i]}') for i in range(len(annot_values))]
+
         axs_row[1].legend(handles=patches, bbox_to_anchor=(1, 1), loc='best', borderaxespad=0, framealpha=0.6)
 
         clustering_result_unique = np.unique(clustering_result_img.ravel())
@@ -260,8 +306,16 @@ def plot_jaccard_grid(img_path: str, annot_path: str, annot_legend_dict: dict, d
         # indicate how many clusters there were before remapping to match annotations
         num_found_clusters = len(np.unique(clustering_result_img.ravel()))
         found_less_clusters_than_classes = f'A total of {total_num_found_clusters - 1} clusters were found' # without background
+        found_same_num_of_clusters_as_classes = f'Found {total_num_found_clusters - 1} clusters with the following matching'
         found_more_clusters_than_classes = f'Showing top {num_found_clusters - 1} clusters out of {total_num_found_clusters - 1}'
-        unsup_clust_title = found_less_clusters_than_classes if total_num_found_clusters < num_annot_values else found_more_clusters_than_classes
+
+        if total_num_found_clusters < num_annot_values:
+            unsup_clust_title = found_less_clusters_than_classes
+        elif total_num_found_clusters > num_annot_values:
+            unsup_clust_title = found_more_clusters_than_classes
+        else:
+            unsup_clust_title = found_same_num_of_clusters_as_classes
+
         axs_row[2].set_title(f'Unsupervised Clustering\n{unsup_clust_title}')
 
         divider = make_axes_locatable(axs_row[2])

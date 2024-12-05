@@ -6,6 +6,8 @@ pipeline_version = "0.0.2"
 
 // Default params
 params.background_color = ""
+params.pairs_max_csv = 'pairs_max_jacc.csv'
+params.annot_legend_path = ""
 
 debug_flag = true
 
@@ -36,8 +38,6 @@ def createCombinations(method_params) {
     // total number of parameters for the method
     def method_params_num = method_params.size()
     // example: 5
-
-    println "method_params_num = ${method_params_num}"
 
     def collected_params_list = method_params.collect { key, values -> values instanceof Map ? \
     tuple(key, values.values, values.bind_to) : tuple(key, values, key) }
@@ -84,28 +84,35 @@ def createCombinations(method_params) {
 
             // now combine parameters pairwise
             def res = []
-            output.values()[0].eachWithIndex {_, idx ->
-                // iterating over the indices of the values in the list (in the example: 3)
-                def combined_res = []
-                output.each { kk, vv ->
-                    // for each [parameter, values_list] pair
 
-                    // append to the combined result parameter name
-                    combined_res << kk
+            if (output.values()[0] instanceof String) {
+                res << [output.keySet()[0], output.values()[0]]
+            } else {
+                output.values()[0].eachWithIndex {_, idx ->
+                    // iterating over the indices of the values in the list (in the example: 3)
+                    def combined_res = []
+                    output.each { kk, vv ->
+                        // for each [parameter, values_list] pair
 
-                    // and parameter value from the list (if it's a list)
-                    if (vv instanceof List)
-                        combined_res << vv[idx]
-                    else
-                        combined_res << vv
+                        // append to the combined result parameter name
+                        combined_res << kk
 
-                    // example: 
-                    // combined_res = [n_components, 10, min_dist, 0.0]
+                        // and parameter value from the list (if it's a list)
+                        if (vv instanceof List)
+                            combined_res << vv[idx]
+                        else
+                            combined_res << vv
+
+                        // example: 
+                        // combined_res = [n_components, 10, min_dist, 0.0]
+                    }
+
+                    // append to the total combinations combined_res
+                    res << combined_res
                 }
-
-                // append to the total combinations combined_res
-                res << combined_res
+                
             }
+            
             return res
         }
         // example:
@@ -160,7 +167,6 @@ def createCombinations(method_params) {
     all_combs_flat = [method, umap, n_components, 10, min_dist, 0.0, n_neighbors, 20, random_state, 42, method, umap, n_components, 10, min_dist, 0.0, n_neighbors, 20, random_state, 42, method, umap, ...]
     */
     
-    all_combs_flat.view()
     // now as we flattened the combinations list we need to group back parameter combinations for different runs
     def all_combs_final = all_combs_flat.flatMap{ kkk -> kkk } // flatten all parameter lists 
         .collate(method_params_num * 2) // group individual run combinations (if there are n parameters -> there are n values, so we group every 2*n elements)
@@ -375,7 +381,8 @@ process calculate_unsupervised_clustering_score {
     script:
     // TODO: fix inconsistent namings
     all_pairs_csv = 'all_pairs_jacc.csv'
-    pairs_max_csv = 'pairs_max_jacc.csv'
+    // pairs_max_csv = 'pairs_max_jacc.csv'
+    pairs_max_csv = params.pairs_max_csv
     """
     calculate_unsupervised_metrics.py \
         --patch_img_path ${patch_img} \
@@ -401,6 +408,7 @@ process generate_report {
     annot_path = annot ? "--annot_path ${annot}" : ""
     integer_annot_path = params.integer_annot_path ? "--integer_annot_path ${params.integer_annot_path}" : ""
     annot_legend_path = params.annot_legend_path ? "--annot_legend_path ${params.annot_legend_path}" : "" // TODO: use as input?
+    class_mapping_csv = params.pairs_max_csv ? "--class_mapping_csv ${params.pairs_max_csv}" : "" // TODO: fix inconsistent names
     """
     generate_report.py \
         --outdir ${outdir} \
@@ -408,6 +416,7 @@ process generate_report {
         ${annot_path} \
         ${integer_annot_path} \
         ${annot_legend_path} \
+        ${class_mapping_csv} \
         --savefile ${html_report}
     """
 }

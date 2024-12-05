@@ -14,6 +14,10 @@
         <h1 class="mb-4">Pipeline Runs</h1>
         <!-- TODO: make this more pleasing to the eye :) -->
         <!-- runs_info_list = [{hash: ..., dimred_html: ..., patchimg_html: ..., parameters_dict: ...}, {...}, ...] -->
+        <!-- TODO: add custom css styles -->
+        <!-- TODO: add sections -->
+        <!-- TODO: add search, filtering, pagination, favourite runs button, move bad runs to trash -->
+        <!-- TODO: add cluster selection interface for each run -->
         <h2>Image</h2>
         <div class="container">
         <div class="row">
@@ -28,10 +32,12 @@
         </div>
         </div>
 
+        {% if jaccard_grid != None %}
         <h2>Grid View Summary</h2>
         <div class="container d-flex justify-content-center align-items-center mb-5">
         {{ jaccard_grid | safe }}
         </div>
+        {% endif %}
 
         {% for run_dict in runs_info_list %}
         <h2>Run {{ run_dict["hash"] }}</h2>

@@ -67,10 +67,11 @@ def process_outdir(outdir: str, metadata_tsv: str='hash_to_combination.tsv') -> 
 
     return runs_info
 
-
+# TODO: add backend selection option: matplotlib, plotly, etc.
 def render_template(img_path: str, runs_info: pd.DataFrame,
                     annot_path: str='', integer_annot_path: str='', 
                     annot_legend_path: str='', 
+                    class_mapping_csv: str='',
                     plots_mpl_cmap: str='omer_colours',
                     template: str='template_report.html.jinja') -> str:
     pipeline_bin_dir = os.path.dirname(os.path.abspath(__file__))
@@ -91,13 +92,28 @@ def render_template(img_path: str, runs_info: pd.DataFrame,
     clustering_info = runs_info[['hash', 'dimred_html', 'patchimg_html', 'parameters_list_of_dicts']]
     clustering_info_list = list(clustering_info.T.to_dict().values())
 
-    # create summary grid with Jaccard scores
-    int_annot_legend = pt.get_allen_brain_int_annot_legend(annot_legend_path) # TODO: make versatile
-    df_hash_and_patch_imgs = runs_info[['hash', 'patch_img']] # TODO: make versatile, get rid of hardcoded values
-    jaccard_grid = pt.plot_jaccard_grid(img_path, integer_annot_path, 
-                                        int_annot_legend, df_hash_and_patch_imgs, 
-                                        cmap=plots_mpl_cmap)
-    jaccard_grid_html = pt.mpl_figure_to_html(jaccard_grid)
+    # create summary grid with Jaccard scores if cluster mapping csv file was provided
+ 
+    # read annotation legend if available to show names of different annotation regions
+    # if not, only class numbers will be presented in the report
+    annot_legend_dict = None
+    if annot_legend_path:
+        annot_legend_dict = pt.read_annotation_legend(annot_legend_path, 
+                                                    class_value_column='color_indices',
+                                                    class_name_column='region_names')
+
+    # add grid only of csv file with cluster mapping was provided
+    # TODO: change this behaviour?
+    jaccard_grid_html = None
+    if class_mapping_csv:
+        clustering_imgs = runs_info['patch_img'].values.tolist()
+        run_hashes = runs_info['hash'].values.tolist()
+    
+        jaccard_grid = pt.plot_jaccard_grid(img_path, integer_annot_path, clustering_imgs, 
+                                            run_hashes, annot_legend_dict, 
+                                            class_mapping_csv=class_mapping_csv,
+                                            cmap=plots_mpl_cmap)
+        jaccard_grid_html = pt.mpl_figure_to_html(jaccard_grid)
 
     html_out = template.render(img=img, annot=annot, 
                                jaccard_grid=jaccard_grid_html, runs_info_list=clustering_info_list)
@@ -113,13 +129,15 @@ def create_report(outdir: str, img_path: str,
                   annot_path: str='', 
                   integer_annot_path: str='',
                   annot_legend_path: str='',
+                  class_mapping_csv: str='',
                   template: str='template_report.html.jinja',
                   plots_mpl_cmap: str='omer_colours',
                   savefile: str='report.html') -> None:
     
     runs_info = process_outdir(outdir, metadata_tsv)
     report_html = render_template(img_path=img_path, runs_info=runs_info, 
-                                  annot_path=annot_path, integer_annot_path=integer_annot_path, 
+                                  annot_path=annot_path, integer_annot_path=integer_annot_path,
+                                  class_mapping_csv=class_mapping_csv, 
                                   annot_legend_path=annot_legend_path, 
                                   plots_mpl_cmap=plots_mpl_cmap,
                                   template=template)
