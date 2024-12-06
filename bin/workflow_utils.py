@@ -227,17 +227,17 @@ def remap_patchimg(patch_img: np.ndarray, class_remapping_dict: dict) -> np.ndar
 
 # === Interoperability utils === #
 
-# NOTE: R must be installed on your system to convert
-import rpy2.robjects as robjects
+# # NOTE: R must be installed on your system to convert
+# import rpy2.robjects as robjects
 
-def np_to_R(arr_path: str, savepath: str | None = None):
-    arr = np.load(arr_path)
-    saveRDS = robjects.r['saveRDS']
+# def np_to_R(arr_path: str, savepath: str | None = None):
+#     arr = np.load(arr_path)
+#     saveRDS = robjects.r['saveRDS']
 
-    if not savepath:
-        savepath = os.path.splitext(arr_path)[0] + '.rds'
+#     if not savepath:
+#         savepath = os.path.splitext(arr_path)[0] + '.rds'
 
-    saveRDS(arr, savepath)
+#     saveRDS(arr, savepath)
     
 
 if __name__ == '__main__':
