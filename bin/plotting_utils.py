@@ -22,36 +22,135 @@ from io import BytesIO
 from typing import List
 
 
-def dimred_2D_html(dimred_path: str, labels_path: str, component_1: int=0, component_2: int=1,
+PLOTTING_BACKENDS = ('matplotlib', 'plotly')
+
+# generic function to plot images with discrete colorbars
+def plot_img_discrete(img_arr: np.array, figsize: tuple=(8, 8)):
+    """
+    Display image with discrete values.
+
+    Parameters
+    ----------
+    img_arr : np.array
+        Image as numpy array.
+
+    figsize : tuple, default: (8, 8)
+        Size of the matplotlib figure.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        Figure with the displayed image.
+    """
+    # get discrete colormap
+    img_arr = img_arr.copy().astype('int')
+    cmap = plt.get_cmap('viridis', np.max(img_arr) - np.min(img_arr) + 1)
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # set limits .5 outside true range
+    img = ax.imshow(img_arr, cmap=cmap, vmin=np.min(img_arr) - 0.5, 
+                      vmax=np.max(img_arr) + 0.5)
+    # tell the colorbar to tick at integers
+
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes('right', size='5%', pad=0.05)
+    fig.colorbar(img, cax=cax, ticks=np.arange(np.min(img_arr), np.max(img_arr) + 1),
+                    orientation='vertical', pad=.1, fraction=0.05)
+    return fig
+
+
+
+
+def dimred_2D_html(dimred_path: str, labels_path: str, component_1: int=0, component_2: int=1, backend: str='plotly', *args, **kwargs):
+    assert backend in PLOTTING_BACKENDS, f'Plotting backend {backend} is not supported. Please \
+    choose from the available options: {PLOTTING_BACKENDS}'
+
+    match backend:
+        case 'plotly':
+            return dimred_2D_html_plotly(dimred_path, labels_path,
+                                             component_1, component_2,
+                                             *args, **kwargs)
+        
+        case 'matplotlib':
+            return dimred_2D_html_matplotlib(dimred_path, labels_path,
+                                             component_1, component_2,
+                                             *args, **kwargs)
+        
+def dimred_2D_html_matplotlib(dimred_path: str, labels_path: str, component_1: int=0, component_2: int=1) -> str:
+    dimred = np.load(dimred_path)
+    labels = np.load(labels_path)
+
+    data = dimred_and_labels_to_dataframe(dimred, labels, component_1, component_2)
+    fig = plot_dimred_2D_labelled_matplotlib(data)
+
+    return mpl_figure_to_html(fig)
+
+def dimred_2D_html_plotly(dimred_path: str, labels_path: str, component_1: int=0, component_2: int=1,
                    include_plotlyjs: str | bool = 'cdn') -> str:
     dimred = np.load(dimred_path)
     labels = np.load(labels_path)
 
     data = dimred_and_labels_to_dataframe(dimred, labels, component_1, component_2)
-
     fig = plot_dimred_2D_labelled(data)
-
     plot_html = fig.to_html(full_html = False, include_plotlyjs=include_plotlyjs)
 
     return plot_html
 
-def img_html(img_path: str, include_plotlyjs: str | bool = 'cdn') -> str:
-    img = ut.read_img(img_path)
+# --- image plotting function --- #
+def img_html(img_path: str, backend: str = 'plotly', *args, **kwargs) -> str:
+    """
+    Available backends:
+    """
 
+    assert backend in PLOTTING_BACKENDS, f'Plotting backend {backend} is not supported. Please \
+    choose from the available options: {PLOTTING_BACKENDS}'
+
+    match backend:
+        case 'plotly':
+            return img_html_plotly(img_path, *args, **kwargs)
+        case 'matplotlib':
+            return img_html_matplotlib(img_path, *args, **kwargs)
+
+
+def img_html_matplotlib(img_path: str) -> str:
+    img = ut.read_img(img_path)
+    fig = plot_img_discrete(img) # TODO: adjust function and use in other places too
+
+    return mpl_figure_to_html(fig)
+
+def img_html_plotly(img_path: str, include_plotlyjs: str | bool = 'cdn') -> str:
+    img = ut.read_img(img_path)
     fig = plot_img(img)
-
     plot_html = fig.to_html(full_html = False, include_plotlyjs=include_plotlyjs)
 
     return plot_html
 
-def img_downscaled_html(img_path: str, size=(400, 400), include_plotlyjs: str | bool = 'cdn') -> str:
+
+def img_downscaled_html(img_path: str, backend: str='plotly', *args, **kwargs) -> str:
+    assert backend in PLOTTING_BACKENDS, f'Plotting backend {backend} is not supported. Please \
+    choose from the available options: {PLOTTING_BACKENDS}'
+
+    match backend:
+        case 'plotly':
+            return img_downscaled_html_plotly(img_path, *args, **kwargs)
+        case 'matplotlib':
+            return img_downscaled_html_matplotlib(img_path, *args, **kwargs)
+
+
+def img_downscaled_html_plotly(img_path: str, size=(400, 400), include_plotlyjs: str | bool = 'cdn') -> str:
     img = ut.read_img(img_path)
-
-    fig = plot_img_downscaled(img, size)
-
+    fig = plot_img_downscaled(img, size) # TODO: rename plot_img_downscaled -> plot_img_downscaled_plotly
     plot_html = fig.to_html(full_html = False, include_plotlyjs=include_plotlyjs)
 
     return plot_html
+
+def img_downscaled_html_matplotlib(img_path: str, size=(400, 400)) -> str:
+    img = ut.read_img(img_path)
+    img_downscaled = downscale_image(img)
+    fig, ax = plt.subplots()
+    ax.imshow(img_downscaled)
+    return mpl_figure_to_html(fig)
+
 
 # TODO: move to workflow utils?
 def dimred_and_labels_to_dataframe(dimred_embeddings: np.array, labels: np.array, component_1: int=0, component_2: int=1):
@@ -70,6 +169,16 @@ def plot_dimred_2D(dimred_embeddings: np.array, component_1: int=0, component_2:
     fig = px.scatter(x=dimred_embeddings[:, component_1], y=dimred_embeddings[:, component_2])
     return fig
 
+
+def plot_dimred_2D_labelled_matplotlib(dat: pd.DataFrame):
+    fig, ax = plt.subplots()
+    ax.scatter(x=dat['component_1'], y=dat['component_2'], c=dat['label'])
+    ax.set_xlabel('Component 1')
+    ax.set_ylabel('Component 2')
+    fig.suptitle('Projections')
+    return fig
+
+
 def plot_dimred_2D_labelled(dat: pd.DataFrame):
     fig = px.scatter(dat, x="component_1", y="component_2", color="label",
                     labels={
@@ -80,12 +189,18 @@ def plot_dimred_2D_labelled(dat: pd.DataFrame):
                     title="Projections")
     return fig
 
-# TODO: downscale without PIL
-def plot_img_downscaled(img_arr: np.array, size=(400, 400)):
+
+def downscale_image(img_arr: np.array, size: tuple=(400, 400)) -> np.array:
     img_pil = Image.fromarray(img_arr)
     img_pil.thumbnail(size)
     img_pil = np.asarray(img_pil)
-    fig = px.imshow(img_pil)
+
+    return img_pil
+
+# TODO: downscale without PIL
+def plot_img_downscaled(img_arr: np.array, size=(400, 400)):
+    img_downscaled = downscale_image(img_arr)
+    fig = px.imshow(img_downscaled)
     return fig
 
 # Can be used for patches, individual LBP features, etc

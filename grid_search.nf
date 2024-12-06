@@ -8,6 +8,7 @@ pipeline_version = "0.0.2"
 params.background_color = ""
 params.pairs_max_csv = 'pairs_max_jacc.csv'
 params.annot_legend_path = ""
+params.plots_backend = 'matplotlib'
 
 debug_flag = true
 
@@ -320,7 +321,7 @@ process dimred {
 
     script:
     """
-    run_umap.py \
+    run_dimensionality_reduction.py \
         --np_data_path ${lbp_result_flattened} \
         --params_str "${params_str}"
     """
@@ -339,7 +340,7 @@ process clustering {
 
     script:
     """
-    run_hdbscan.py \
+    run_clustering.py \
         --np_data_path ${data} \
         --params_str "${params_str}"
     """
@@ -409,6 +410,7 @@ process generate_report {
     integer_annot_path = params.integer_annot_path ? "--integer_annot_path ${params.integer_annot_path}" : ""
     annot_legend_path = params.annot_legend_path ? "--annot_legend_path ${params.annot_legend_path}" : "" // TODO: use as input?
     class_mapping_csv = params.pairs_max_csv ? "--class_mapping_csv ${params.pairs_max_csv}" : "" // TODO: fix inconsistent names
+    plots_backend = params.plots_backend ? "--plots_backend ${params.plots_backend}" : "" // TODO: if I leave empty str as default will it work correctly?
     """
     generate_report.py \
         --outdir ${outdir} \
@@ -417,6 +419,7 @@ process generate_report {
         ${integer_annot_path} \
         ${annot_legend_path} \
         ${class_mapping_csv} \
+        ${plots_backend} \
         --savefile ${html_report}
     """
 }

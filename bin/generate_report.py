@@ -50,7 +50,7 @@ def get_runs_data(outdir: str, dimred_outname: str="embeddings.npy",
 
     return pd.DataFrame(res_dict, dtype='string')
 
-def process_outdir(outdir: str, metadata_tsv: str='hash_to_combination.tsv') -> pd.DataFrame:
+def process_outdir(outdir: str, metadata_tsv: str='hash_to_combination.tsv', plots_backend: str='plotly') -> pd.DataFrame:
     runs_data = get_runs_data(outdir)
 
     metadata_abs_path = os.path.join(outdir, metadata_tsv)
@@ -59,8 +59,9 @@ def process_outdir(outdir: str, metadata_tsv: str='hash_to_combination.tsv') -> 
     # contains hash, paths to the output files and params dict
     runs_info = runs_data.merge(metadata, on='hash')
 
-    runs_info['dimred_html'] = runs_info.apply(lambda dat: pt.dimred_2D_html(dat.dimred, dat.clustering), axis=1)
-    runs_info['patchimg_html'] = runs_info.apply(lambda dat: pt.img_html(dat.patch_img), axis=1)
+    runs_info['dimred_html'] = runs_info.apply(lambda dat: pt.dimred_2D_html(dat.dimred, dat.clustering, backend=plots_backend), axis=1)
+    runs_info['patchimg_html'] = runs_info.apply(lambda dat: pt.img_html(dat.patch_img, backend=plots_backend), axis=1)
+
 
     # TODO: hardcoded values
     # essential_info = runs_info[['hash', 'dimred_html', 'patchimg_html', 'parameters_list_of_dicts']]
@@ -73,6 +74,7 @@ def render_template(img_path: str, runs_info: pd.DataFrame,
                     annot_legend_path: str='', 
                     class_mapping_csv: str='',
                     plots_mpl_cmap: str='omer_colours',
+                    plots_backend: str='plotly',
                     template: str='template_report.html.jinja') -> str:
     pipeline_bin_dir = os.path.dirname(os.path.abspath(__file__))
     template_abs_path = os.path.join(pipeline_bin_dir, template)
@@ -82,12 +84,12 @@ def render_template(img_path: str, runs_info: pd.DataFrame,
     template = env.get_template(template) # FIXME: or template_abs_path?
 
     # generate downscaled image plot
-    img = pt.img_downscaled_html(img_path)
+    img = pt.img_downscaled_html(img_path, backend=plots_backend)
 
     # generate downscaled annotations if possible
     annot = None
     if annot_path:
-        annot = pt.img_downscaled_html(annot_path)
+        annot = pt.img_downscaled_html(annot_path, backend=plots_backend)
 
     clustering_info = runs_info[['hash', 'dimred_html', 'patchimg_html', 'parameters_list_of_dicts']]
     clustering_info_list = list(clustering_info.T.to_dict().values())
@@ -132,14 +134,16 @@ def create_report(outdir: str, img_path: str,
                   class_mapping_csv: str='',
                   template: str='template_report.html.jinja',
                   plots_mpl_cmap: str='omer_colours',
+                  plots_backend: str='plotly',
                   savefile: str='report.html') -> None:
     
-    runs_info = process_outdir(outdir, metadata_tsv)
+    runs_info = process_outdir(outdir, metadata_tsv, plots_backend=plots_backend)
     report_html = render_template(img_path=img_path, runs_info=runs_info, 
                                   annot_path=annot_path, integer_annot_path=integer_annot_path,
                                   class_mapping_csv=class_mapping_csv, 
                                   annot_legend_path=annot_legend_path, 
                                   plots_mpl_cmap=plots_mpl_cmap,
+                                  plots_backend=plots_backend,
                                   template=template)
 
     with open(savefile, 'w') as f:

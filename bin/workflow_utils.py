@@ -224,5 +224,21 @@ def remap_patchimg(patch_img: np.ndarray, class_remapping_dict: dict) -> np.ndar
         res[class_mask] = int(class_remapping_dict[str(class_val)][0])
     return res
 
+
+# === Interoperability utils === #
+
+# NOTE: R must be installed on your system to convert
+import rpy2.robjects as robjects
+
+def np_to_R(arr_path: str, savepath: str | None = None):
+    arr = np.load(arr_path)
+    saveRDS = robjects.r['saveRDS']
+
+    if not savepath:
+        savepath = os.path.splitext(arr_path)[0] + '.rds'
+
+    saveRDS(arr, savepath)
+    
+
 if __name__ == '__main__':
     fire.Fire()
