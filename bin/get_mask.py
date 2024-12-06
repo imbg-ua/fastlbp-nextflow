@@ -44,7 +44,7 @@ def check_annotations(annotations: str, background_val_str: str = "", savefile: 
     elif len(annot.shape) == 2:
         tissue_mask = annot
     else:
-        raise ValuError('Annnotations shape is not valid.')
+        raise ValueError('Annnotations shape is not valid.')
 
     np.save(savefile, tissue_mask)
     
