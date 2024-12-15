@@ -47,6 +47,11 @@ def plot_img_discrete(img_arr: np.array, figsize: tuple=(8, 8)):
     cmap = plt.get_cmap('viridis', np.max(img_arr) - np.min(img_arr) + 1)
     fig, ax = plt.subplots(figsize=figsize)
 
+    # TODO: fix this
+    """
+    RuntimeWarning: More than 20 figures have been opened. Figures created through the pyplot interface (`matplotlib.pyplot.figure`) are retained until explicitly closed and may consume too much memory. (To control this warning, see the rcParam `figure.max_open_warning`). Consider using `matplotlib.pyplot.close()`.
+    """
+
     # set limits .5 outside true range
     img = ax.imshow(img_arr, cmap=cmap, vmin=np.min(img_arr) - 0.5, 
                       vmax=np.max(img_arr) + 0.5)
@@ -116,7 +121,11 @@ def img_html_matplotlib(img_path: str) -> str:
     img = ut.read_img(img_path)
     fig = plot_img_discrete(img) # TODO: adjust function and use in other places too
 
-    return mpl_figure_to_html(fig)
+    fig_html = mpl_figure_to_html(fig)
+
+    plt.close(fig)
+
+    return fig_html
 
 def img_html_plotly(img_path: str, include_plotlyjs: str | bool = 'cdn') -> str:
     img = ut.read_img(img_path)
