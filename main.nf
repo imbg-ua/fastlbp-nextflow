@@ -1,29 +1,15 @@
 #!/usr/bin/env/ nextflow
 
-nextflow.enable.dsl = 2
+include { info_log; check_nextflow_version; get_value_from_param_list } from 'lib/nf/utils'
 
+nextflow.enable.dsl = 2
 pipeline_version = "0.0.2"
 
-// Default params
-params.background_color = ""
+check_nextflow_version()
 
-debug_flag = true
+// params.annot_suffix = "annotation"
 
-if ( !nextflow.version.matches(">=24.04") ) {
-    error "The workflow requires Nextflow version 24.04 or greater, your current version is ${nextflow.version}"
-}
 
-params.annot_suffix = "annotation"
-
-def info_log(msg) {
-    // let's make it yellow on a black bg
-    log.info("\u001B[93;40;1m" + msg + "\u001B[0m")
-}
-
-def extract_patchsize_from_lbp_params_list(lbp_params_list) {
-    def res = lbp_params_list.find { it[0] == "patchsize" }
-    res[1]
-}
 
 // TODO: update to new config format (as used in grid_search.nf)
 def params_args_list = params.args.collect { k, v -> [k, v] }
@@ -35,7 +21,7 @@ def hdbscan_params = params.args.clustering.collect { k, v -> [k, v] }
 
 process convert_annotations_to_binmask {
     tag "mask preprocessing"
-    debug debug_flag
+    debug params.debug_flag
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
@@ -58,7 +44,7 @@ process convert_annotations_to_binmask {
 
 process get_tissue_mask {
     tag "${img_id}"
-    debug debug_flag
+    debug params.debug_flag
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
@@ -79,7 +65,7 @@ process get_tissue_mask {
 
 process downscale_mask {
     tag "${img_id}"
-    debug debug_flag
+    debug params.debug_flag
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
@@ -101,7 +87,7 @@ process downscale_mask {
 
 process fastlbp {
     tag "${img_id}"
-    debug debug_flag
+    debug params.debug_flag
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
@@ -127,7 +113,7 @@ process fastlbp {
 
 process dimred {
     tag "${img_id}"
-    debug debug_flag
+    debug params.debug_flag
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
@@ -138,7 +124,7 @@ process dimred {
 
     script:
     """
-    run_umap.py \
+    run_dimensionality_reduction.py \
         --np_data_path ${lbp_result_flattened} \
         --params_str "${params_str}"
     """
@@ -146,7 +132,7 @@ process dimred {
 
 process clustering {
     tag "${img_id}"
-    debug debug_flag
+    debug params.debug_flag
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
@@ -157,7 +143,7 @@ process clustering {
 
     script:
     """
-    run_hdbscan.py \
+    run_clustering.py \
         --np_data_path ${data} \
         --params_str "${params_str}"
     """
@@ -165,7 +151,7 @@ process clustering {
 
 process labels_to_patch_img {
     tag "${img_id}"
-    debug debug_flag
+    debug params.debug_flag
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
@@ -228,7 +214,7 @@ workflow SingleImage {
         get_tissue_mask.out
             .combine([[lbp_params]])
             .map { img, pixelmask, lbp_params_list_cur ->
-            tuple(img, pixelmask, extract_patchsize_from_lbp_params_list(lbp_params_list_cur))}
+            tuple(img, pixelmask, get_value_from_param_list(lbp_params_list_cur, "patchsize"))}
             .set { downscale_me }
         
         downscale_mask(downscale_me)
@@ -282,7 +268,7 @@ workflow SingleImage {
         img_and_mask
             .combine([[lbp_params]])
             .map { img, annot, lbp_params_list_cur ->
-            tuple(img, annot, extract_patchsize_from_lbp_params_list(lbp_params_list_cur)) }
+            tuple(img, annot, get_value_from_param_list(lbp_params_list_cur, "patchsize")) }
             .set { downscale_me }
 
         downscale_mask(downscale_me)
@@ -332,7 +318,7 @@ workflow OtsuWorkflow {
     get_tissue_mask.out
         .combine([[lbp_params]])
         .map { img, pixelmask, lbp_params_list_cur ->
-        tuple(img, pixelmask, extract_patchsize_from_lbp_params_list(lbp_params_list_cur))}
+        tuple(img, pixelmask, get_value_from_param_list(lbp_params_list_cur, "patchsize"))}
         .set { downscale_me }
     
     downscale_mask(downscale_me)
@@ -480,7 +466,7 @@ workflow MultiImage {
         
         convert_annotations_to_binmask.out
             .map { imgg, binmaskk ->
-            tuple(imgg, binmaskk,  extract_patchsize_from_lbp_params_list(lbp_params)) }
+            tuple(imgg, binmaskk,  get_value_from_param_list(lbp_params)) }
             .set { downscale_me_with_mask }
         
         ProvidedMaskWorkflow(downscale_me_with_mask)
@@ -550,7 +536,7 @@ workflow MultiImage {
             get_tissue_mask.out
                 .combine([[lbp_params]])
                 .map { img, pixelmask, lbp_params_list_cur ->
-                tuple(img, pixelmask, extract_patchsize_from_lbp_params_list(lbp_params_list_cur))}
+                tuple(img, pixelmask, get_value_from_param_list(lbp_params_list_cur, "patchsize"))}
                 .set { downscale_me }
 
             downscale_mask(downscale_me)
@@ -597,7 +583,7 @@ workflow MultiImage {
                 }
                 .combine([[lbp_params]])
                 .map { img, pixelmask, lbp_params_list_cur ->
-                tuple(img, pixelmask, extract_patchsize_from_lbp_params_list(lbp_params_list_cur))}
+                tuple(img, pixelmask, get_value_from_param_list(lbp_params_list_cur, "patchsize"))}
                 .set { downscale_me }
 
             downscale_mask(downscale_me)
