@@ -9,8 +9,8 @@ def check_nextflow_version() {
     }
 }
 
-def get_value_from_param_list(params_list, param_name) {
-    // params list with strucute [[key_1, val_1], [key_2, val_2], ...]
+def get_value_from_param_list(params_list, param_name = 'patchsize') {
+    // params list of the following structure: [[param_1, value_1], [param_2, value_2], ...]
     def res = params_list.find { it[0] == param_name }
     res[1]
 }
