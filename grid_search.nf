@@ -1,6 +1,11 @@
 #!/usr/bin/env/ nextflow
 
-include { info_log; check_nextflow_version; get_value_from_param_list } from './lib/nf/utils'
+include { info_log; 
+          check_nextflow_version; 
+          get_value_from_param_list; 
+          check_nested_parameter_combinations;
+          get_final_outdir_from_params_combinations;
+          get_all_output_files_from_params_combinations } from './lib/nf/utils'
 
 nextflow.enable.dsl = 2
 
@@ -415,17 +420,6 @@ process generate_report {
 
 // TODO: implement repeating parts as subworkflows
 
-// workflow RunFastLBPAndPrepareForNextStep {
-//     take:
-//     tuple val(parameter_combination_step_outdir), path(input_img_path), path(pixel_mask), path(patch_mask), val(parameters_str)
-
-//     main:
-//     fastlbp()
-
-//     emit:
-//     fastlbp.out
-// }
-
 workflow GetParameterCombinations {
     main:
     
@@ -496,6 +490,54 @@ workflow ParameterCombinationsToMap {
     parameter_combinations_map
 }
 
+workflow RunFastLBPAndPrepareForNextStep {
+    take:
+    fastlbp_inputs_channel
+    next_step_combinations_map
+
+    main:
+    fastlbp(fastlbp_inputs_channel)
+
+    fastlbp.out.lbp_data_folder
+        .set { all_lbp_outputs }
+
+    fastlbp.out.lbp_result_file_flattened
+        .combine(next_step_combinations_map)
+        .map { lbp_outdir, lbp_result_flattened_cur, next_step_params_str, next_step_params ->
+        tuple("${lbp_outdir}/${next_step_params_str}", lbp_result_flattened_cur, next_step_params) }
+        .set {next_step_inputs_channel}
+
+    fastlbp.out.lbp_result_file_img
+        .set { lbp_img }
+
+    emit:
+    all_lbp_outputs
+    next_step_inputs_channel
+    lbp_img
+}
+
+workflow RunDimRedAndPrepareForNextStep {
+    take:
+    dimred_inputs_channel
+    next_step_combinations_map
+
+    main:
+    dimred(dimred_inputs_channel)
+
+    dimred.out
+        .set { all_umap_outputs }
+
+    dimred.out
+        .combine(next_step_combinations_map)
+        .map { umap_outdir, umap_embeddings, hdbscan_params_str, hdbscan_params ->
+        tuple("${umap_outdir}/${hdbscan_params_str}", umap_embeddings, hdbscan_params) }
+        .set { next_step_inputs_channel }
+
+    emit:
+    all_umap_outputs
+    next_step_inputs_channel
+}
+
 workflow NoMaskWorkflow {
 
     take:
@@ -511,30 +553,16 @@ workflow NoMaskWorkflow {
         tuple(lbp_params_str, params.img_path, [], [], lbp_params) }
         .set { feed_me_into_lbp }
     
-    fastlbp(feed_me_into_lbp)
+    RunFastLBPAndPrepareForNextStep(feed_me_into_lbp, umap_combinations_hash_outdir)
 
-    fastlbp.out.lbp_data_folder
-        .set { all_lbp_outputs }
+    all_lbp_outputs = RunFastLBPAndPrepareForNextStep.out.all_lbp_outputs
+    feed_me_into_umap = RunFastLBPAndPrepareForNextStep.out.next_step_inputs_channel
+    lbp_img = RunFastLBPAndPrepareForNextStep.out.lbp_img
 
-    fastlbp.out.lbp_result_file_flattened
-        .combine(umap_combinations_hash_outdir)
-        .map { lbp_outdir, lbp_result_flattened_cur, umap_params_str, umap_params ->
-        tuple("${lbp_outdir}/${umap_params_str}", lbp_result_flattened_cur, umap_params) }
-        .set {feed_me_into_umap}
+    RunDimRedAndPrepareForNextStep(feed_me_into_umap, hdbscan_combinations_hash_outdir)
+    all_umap_outputs = RunDimRedAndPrepareForNextStep.out.all_umap_outputs
+    feed_me_into_hdbscan = RunDimRedAndPrepareForNextStep.out.next_step_inputs_channel
 
-    fastlbp.out.lbp_result_file_img
-        .set { lbp_img }
-
-    dimred(feed_me_into_umap)
-
-    dimred.out
-        .set { all_umap_outputs }
-
-    dimred.out
-        .combine(hdbscan_combinations_hash_outdir)
-        .map { umap_outdir, umap_embeddings, hdbscan_params_str, hdbscan_params ->
-        tuple("${umap_outdir}/${hdbscan_params_str}", umap_embeddings, hdbscan_params) }
-        .set { feed_me_into_hdbscan }
 
     clustering(feed_me_into_hdbscan)
 
@@ -555,19 +583,22 @@ workflow NoMaskWorkflow {
     labels_to_patch_img(convert_me_back_to_image)
 
     labels_to_patch_img.out
-        .set { all_deconvolves_images_outputs }
+        .set { all_deconvolved_images_outputs }
 
     all_lbp_outputs
         .combine(all_umap_outputs)
         .combine(all_hdbscan_outputs)
-        .combine(all_deconvolves_images_outputs)
-        .filter { it[2].contains(it[0]) && it[4].contains(it[2]) && it[6].contains(it[4]) }
-        .multiMap { lbp_outdirr, lbp_dataa, umap_outdirr, umap_dataa, hdbscan_outdirr, hdbscan_dataa, 
-        deconvolve_outdirr, deconvolve_dataa ->
+        .combine(all_deconvolved_images_outputs)
+        .filter { outputs -> check_nested_parameter_combinations(outputs) }
+        .map { outputs -> 
+        tuple(get_final_outdir_from_params_combinations(outputs).replaceAll(',', ';'), 
+        get_all_output_files_from_params_combinations(outputs), 
+        get_final_outdir_from_params_combinations(outputs).replaceAll(',', ';').md5()) }
+        .multiMap { final_combination_for_outdir, all_outputs_tuple, final_combination_for_outdir_hash ->
         // replace commas with semicolons to distinguish between inner parameters list and
         // outer combination-to-hash list 
-        data_to_save: tuple(deconvolve_outdirr.replaceAll(",", ";").md5(), tuple(lbp_dataa, umap_dataa, hdbscan_dataa, deconvolve_dataa))
-        dir_and_hash: tuple(deconvolve_outdirr.replaceAll(",", ";"), deconvolve_outdirr.replaceAll(",", ";").md5()) }
+        data_to_save: tuple(final_combination_for_outdir_hash, all_outputs_tuple)
+        dir_and_hash: tuple(final_combination_for_outdir, final_combination_for_outdir_hash) }
         .set { final_data_and_folders }
 
     final_data_and_folders.data_to_save
@@ -631,30 +662,15 @@ workflow OtsuMaskWorkflow {
         tuple(downscale_outdir, imgg, pixelmask_path, patchmask_path, lbp_params) }
         .set { feed_me_into_lbp }
 
-    fastlbp(feed_me_into_lbp)
+    RunFastLBPAndPrepareForNextStep(feed_me_into_lbp)
+    all_lbp_outputs = RunFastLBPAndPrepareForNextStep.out.all_lbp_outputs
+    feed_me_into_umap = RunFastLBPAndPrepareForNextStep.out.next_step_inputs_channel
+    lbp_img = RunFastLBPAndPrepareForNextStep.out.lbp_img
 
-    fastlbp.out.lbp_data_folder
-        .set { all_lbp_outputs }
 
-    fastlbp.out.lbp_result_file_flattened
-        .combine(umap_combinations_hash_outdir)
-        .map { lbp_outdir, lbp_result_flattened_cur, umap_params_str, umap_params ->
-        tuple("${lbp_outdir}/${umap_params_str}", lbp_result_flattened_cur, umap_params) }
-        .set {feed_me_into_umap}
-
-    fastlbp.out.lbp_result_file_img
-        .set { lbp_img }
-
-    dimred(feed_me_into_umap)
-
-    dimred.out
-        .set { all_umap_outputs }
-
-    dimred.out
-        .combine(hdbscan_combinations_hash_outdir)
-        .map { umap_outdir, umap_embeddings, hdbscan_params_str, hdbscan_params ->
-        tuple("${umap_outdir}/${hdbscan_params_str}", umap_embeddings, hdbscan_params) }
-        .set { feed_me_into_hdbscan }
+    RunDimRedAndPrepareForNextStep(feed_me_into_umap, hdbscan_combinations_hash_outdir)
+    all_umap_outputs = RunDimRedAndPrepareForNextStep.out.all_umap_outputs
+    feed_me_into_hdbscan = RunDimRedAndPrepareForNextStep.out.next_step_inputs_channel
 
     clustering(feed_me_into_hdbscan)
 
@@ -675,15 +691,15 @@ workflow OtsuMaskWorkflow {
     labels_to_patch_img(convert_me_back_to_image)
 
     labels_to_patch_img.out
-        .set { all_deconvolves_images_outputs }
+        .set { all_deconvolved_images_outputs }
 
     all_downscale_outputs
         .combine(all_lbp_outputs)
         .combine(all_umap_outputs)
         .combine(all_hdbscan_outputs)
-        .combine(all_deconvolves_images_outputs)
-        .filter { it[2].contains(it[0]) && it[4].contains(it[2]) && 
-        it[6].contains(it[4]) && it[8].contains(it[6]) } // as there is additional step as compared to no mask 
+        .combine(all_deconvolved_images_outputs)
+        .filter { all_param_hashes_and_outputs ->
+            check_nested_parameter_combinations(all_param_hashes_and_outputs) } // there is additional step as compared to no mask 
         .multiMap { downscale_outdirr, downscale_dataa, lbp_outdirr, lbp_dataa, umap_outdirr, umap_dataa, hdbscan_outdirr, hdbscan_dataa, 
         deconvolve_outdirr, deconvolve_dataa ->
         // replace commas with semicolons to distinguish between inner parameters list and
@@ -799,11 +815,11 @@ workflow MaskWorkflow {
     labels_to_patch_img(convert_me_back_to_image)
 
     labels_to_patch_img.out
-        .set { all_deconvolves_images_outputs }
+        .set { all_deconvolved_images_outputs }
 
     // Calculate Jaccard scores for runs with respect to annotations
     // and do cluster matching in a greedy fashion
-    all_deconvolves_images_outputs
+    all_deconvolved_images_outputs
         .map { patch_img_outdir, patch_img ->
         tuple(patch_img_outdir, params.integer_annot, patch_img) }
         .set { runs_to_calculate_eval_metric }
@@ -816,7 +832,7 @@ workflow MaskWorkflow {
         .combine(all_lbp_outputs)
         .combine(all_umap_outputs)
         .combine(all_hdbscan_outputs)
-        .combine(all_deconvolves_images_outputs)
+        .combine(all_deconvolved_images_outputs)
         .combine(calculated_metrics_outputs)
         .filter { it[2].contains(it[0]) && it[4].contains(it[2]) && // TODO: don't embarass yourself with this
         it[6].contains(it[4]) && it[8].contains(it[6]) && it[10].contains(it[8])} // as there are additional steps as compared to no mask 
