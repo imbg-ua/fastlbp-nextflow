@@ -44,23 +44,38 @@ def plot_img_discrete(img_arr: np.array, figsize: tuple=(8, 8)):
     """
     # get discrete colormap
     img_arr = img_arr.copy().astype('int')
-    cmap = plt.get_cmap('viridis', np.max(img_arr) - np.min(img_arr) + 1)
+    all_values = np.unique(img_arr)
+    total_clust_num = len(all_values)
+    cmap = plt.get_cmap('viridis', total_clust_num) # cmap restricted to the total number of clusters
     fig, ax = plt.subplots(figsize=figsize)
+
+    # FIXME: remap cluster values to a uniform range to simplify visualization and not 
+    # implement a custom colormap normalization method
+    # TODO: implement a custom colormap normalization method
+
+    img_arr_uniform = np.empty(shape=(img_arr.shape[0], img_arr.shape[1]), dtype=np.uint16)
+    for idx, val in enumerate(all_values):
+        val_mask = img_arr == val
+        img_arr_uniform[val_mask] = idx        
 
     # TODO: fix this
     """
-    RuntimeWarning: More than 20 figures have been opened. Figures created through the pyplot interface (`matplotlib.pyplot.figure`) are retained until explicitly closed and may consume too much memory. (To control this warning, see the rcParam `figure.max_open_warning`). Consider using `matplotlib.pyplot.close()`.
+    RuntimeWarning: More than 20 figures have been opened. Figures created through the pyplot interface 
+    (`matplotlib.pyplot.figure`) are retained until explicitly closed and may consume too much memory. 
+    (To control this warning, see the rcParam `figure.max_open_warning`). Consider using `matplotlib.pyplot.close()`.
     """
 
-    # set limits .5 outside true range
-    img = ax.imshow(img_arr, cmap=cmap, vmin=np.min(img_arr) - 0.5, 
-                      vmax=np.max(img_arr) + 0.5)
-    # tell the colorbar to tick at integers
+    # set limits 0.5 outside the true range
+    img = ax.imshow(img_arr_uniform, cmap=cmap, vmin=-.5, vmax=total_clust_num - .5)
 
+    # tell the colorbar to tick at integers
     divider = make_axes_locatable(ax)
     cax = divider.append_axes('right', size='5%', pad=0.05)
-    fig.colorbar(img, cax=cax, ticks=np.arange(np.min(img_arr), np.max(img_arr) + 1),
+    cbar = fig.colorbar(img, cax=cax, ticks=np.arange(total_clust_num),
                     orientation='vertical', pad=.1, fraction=0.05)
+
+    cbar.ax.set_yticklabels(all_values) # set real cluster labels as ticks
+
     return fig
 
 
