@@ -571,6 +571,18 @@ workflow RunClustering {
     all_clustering_outputs = clustering.out
 }
 
+workflow LabelsToPatchImage {
+    take:
+    labels_to_patch_img_inputs_channel
+
+    main:
+
+    labels_to_patch_img(labels_to_patch_img_inputs_channel)
+
+    emit:
+    all_deconvolved_images_outputs = labels_to_patch_img.out
+}
+
 // // TODO: the most pressing part to refactor 
 
 // workflow GetTissueMask {
@@ -597,13 +609,42 @@ workflow RunClustering {
 //     emit:
 // }
 
-// workflow AllCombinationsToHashes {
-//     take:
+workflow AllCombinationsToHashes {
+    take:
+    all_input_channels // each channel must have the following structure: [step_param_list_str, step_output]
 
-//     main:
+    main:
 
-//     emit:
-// }
+    // combine all channels to get all possible parameter combinations used in different steps
+    def first_channel = all_input_channels[0]
+    def residual_channels = all_input_channels[1..-1]
+
+    def combined_channel = residual_channels
+                                .inject(first_channel, { accumulated_channels, curr_channel ->
+                                accumulated_channels.combine(curr_channel) 
+                                }
+                            )
+
+    // filter the resulting combinations to retain the final parameter combination strings
+    // i.e. the channel currently contains combinations for lbp, for lbp+umap, for lbp+umap+hdbscan
+    // we want to leave only the entries describing the full pipeline, that is only lbp+umap+hdbscan
+    combined_channel
+        .filter { outputs -> checkNestedParameterCombinations(outputs) }
+        .map { outputs -> 
+        tuple(getFinalOutdirFromParamsCombinations(outputs).replaceAll(',', ';'), 
+        getAllOutputFilesFromParamsCombinations(outputs), 
+        getFinalOutdirFromParamsCombinations(outputs).replaceAll(',', ';').md5()) }
+        .multiMap { final_combination_for_outdir, all_outputs_tuple, final_combination_for_outdir_hash ->
+        // replace commas with semicolons to distinguish between inner parameters list and
+        // outer combination-to-hash list 
+        data_to_save: tuple(final_combination_for_outdir_hash, all_outputs_tuple)
+        dir_and_hash: tuple(final_combination_for_outdir, final_combination_for_outdir_hash) }
+        .set { final_data_and_folders }
+
+    emit:
+    data_to_save = final_data_and_folders.data_to_save
+    dir_and_hash = final_data_and_folders.dir_and_hash
+}
 
 // workflow MoveDataToOutdir {
 //     take:
@@ -661,28 +702,14 @@ workflow NoMaskWorkflow {
         tuple(clustering_outdir, clustering_labels_path, patchmask_path, lbp_img_path) }
         .set { convert_me_back_to_image }
 
-    labels_to_patch_img(convert_me_back_to_image)
+    LabelsToPatchImage(convert_me_back_to_image)
+    all_deconvolved_images_outputs = LabelsToPatchImage.out.all_deconvolved_images_outputs
 
-    labels_to_patch_img.out
-        .set { all_deconvolved_images_outputs }
+    AllCombinationsToHashes([all_lbp_outputs, all_umap_outputs, all_hdbscan_outputs, all_deconvolved_images_outputs])
+    data_to_save = AllCombinationsToHashes.out.data_to_save
+    dir_and_hash = AllCombinationsToHashes.out.dir_and_hash
 
-    all_lbp_outputs
-        .combine(all_umap_outputs)
-        .combine(all_hdbscan_outputs)
-        .combine(all_deconvolved_images_outputs)
-        .filter { outputs -> checkNestedParameterCombinations(outputs) }
-        .map { outputs -> 
-        tuple(getFinalOutdirFromParamsCombinations(outputs).replaceAll(',', ';'), 
-        getAllOutputFilesFromParamsCombinations(outputs), 
-        getFinalOutdirFromParamsCombinations(outputs).replaceAll(',', ';').md5()) }
-        .multiMap { final_combination_for_outdir, all_outputs_tuple, final_combination_for_outdir_hash ->
-        // replace commas with semicolons to distinguish between inner parameters list and
-        // outer combination-to-hash list 
-        data_to_save: tuple(final_combination_for_outdir_hash, all_outputs_tuple)
-        dir_and_hash: tuple(final_combination_for_outdir, final_combination_for_outdir_hash) }
-        .set { final_data_and_folders }
-
-    final_data_and_folders.data_to_save
+    data_to_save
         .transpose()
         .map { params_hash, step_dataa ->
         tuple("${params.outdir}/${params_hash}", step_dataa) }
@@ -690,7 +717,7 @@ workflow NoMaskWorkflow {
 
     copy_files_to_target_dir(dirs_and_data_to_save)
 
-    final_data_and_folders.dir_and_hash
+    dir_and_hash
         .toList()
         .set { combinations_metadata }
     
