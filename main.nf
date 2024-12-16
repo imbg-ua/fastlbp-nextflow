@@ -176,7 +176,7 @@ workflow SingleImage {
 
     if ( !params.mask ) {
 
-        info_log("No mask mode")
+        infoLog("No mask mode")
 
         lbp_input_ch = Channel.of([params.img_path, [], [], lbp_params])
 
@@ -207,7 +207,7 @@ workflow SingleImage {
 
     } else if ( params.mask == "auto" ) {
         
-        info_log("Otsu mask mode")
+        infoLog("Otsu mask mode")
 
         get_tissue_mask(tuple(params.img_path, params.background_color))
 
@@ -255,7 +255,7 @@ workflow SingleImage {
 
         // Mask mode
         
-        info_log("Provided mask mode")
+        infoLog("Provided mask mode")
 
         annot_to_convert = Channel.of([params.img_path, file(params.mask), 
         params.background_color])
@@ -494,7 +494,7 @@ workflow MultiImage {
         imgs = files("${params.imgs_dir}/*")
 
         if ( !params.masks ) {
-            info_log("No mask mode")
+            infoLog("No mask mode")
 
             imgs_and_masks = Channel.fromList(imgs)
                 .map { it -> 
@@ -526,7 +526,7 @@ workflow MultiImage {
 
             labels_to_patch_img(convert_my_labels_to_img)
         } else if ( params.masks == "auto" ) {
-            info_log("Otsu mask mode")
+            infoLog("Otsu mask mode")
             
             imgs_ch = Channel.fromList(imgs)
             imgs_ch
@@ -574,7 +574,7 @@ workflow MultiImage {
 
             labels_to_patch_img(convert_my_labels_to_img)
         } else {
-            info_log("Masks directory mode")
+            infoLog("Masks directory mode")
 
             imgs_and_masks = Channel.fromList(imgs)
                 .map {it -> 

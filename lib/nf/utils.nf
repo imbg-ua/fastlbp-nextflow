@@ -1,21 +1,21 @@
-def info_log(msg) {
+def infoLog(msg) {
     // let's make it yellow on a black bg
     log.info("\u001B[93;40;1m" + msg + "\u001B[0m")
 }
 
-def check_nextflow_version() {
+def checkNextflowVersion() {
     if ( !nextflow.version.matches(">=24.04") ) {
         error "The workflow requires Nextflow version 24.04 or greater, your current version is ${nextflow.version}"
     }
 }
 
-def get_value_from_param_list(params_list, param_name = 'patchsize') {
+def getValueFromParamList(params_list, param_name = 'patchsize') {
     // params list of the following structure: [[param_1, value_1], [param_2, value_2], ...]
     def res = params_list.find { it[0] == param_name }
     res[1]
 }
 
-def check_nested_parameter_combinations(param_combinations_and_outputs) {
+def checkNestedParameterCombinations(param_combinations_and_outputs) {
     // Mandatory structure of the input param_combinations_and_outputs: [step1_parameter_combination_hash, step1_output, 
     // step2_parameter_combination_hash, step2_output, ...]
 
@@ -28,7 +28,7 @@ def check_nested_parameter_combinations(param_combinations_and_outputs) {
     // it[2].contains(it[0]) && it[4].contains(it[2]) && it[6].contains(it[4])
 }
 
-def get_final_outdir_from_params_combinations(param_combinations_and_outputs) {
+def getFinalOutdirFromParamsCombinations(param_combinations_and_outputs) {
     // assuming that all the parameters and combinations go like this:
     /*
         .multiMap { lbp_outdirr, lbp_dataa, 
@@ -47,8 +47,8 @@ def get_final_outdir_from_params_combinations(param_combinations_and_outputs) {
     return param_combinations_and_outputs[-2]
 }
 
-
-def get_all_output_files_from_params_combinations(param_combinations_and_outputs) {
+// TODO: switch to camel case to enhance consistency with Groovy conventions
+def getAllOutputFilesFromParamsCombinations(param_combinations_and_outputs) {
     def even_elements = param_combinations_and_outputs.findAll { param_combinations_and_outputs.indexOf(it) % 2 != 0 }
     // println "$even_elements qweqweqwesss"
     return even_elements as Tuple
