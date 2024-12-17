@@ -1,6 +1,9 @@
 ---
 title: "fastLBP output analysis in R"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
 ---
 
 # Introduction
@@ -11,11 +14,14 @@ This is the R version of the downstream analysis of the [fastlbp](https://pypi.o
 
 ```{r}
 library(reticulate) # Python integration
-library(raster)
+library(raster) # raster image visualisation
+library(png)
+library(umap)
 # library(fields) # optional
 ```
 
-Set up the environment with `NumPy` or specify a path to the corresponding Python executable. **NOTE** replace `data_analysis`/`my_env` with your real environment name.
+Set up a Python environment with the `NumPy`, `scipy` and `skimage` packages or specify a path to the corresponding Python executable. **NOTE** replace `data_analysis`/`my_env` with your real environment name.
+
 ```{r}
 # use an env with numpy or select a suitable interpreter
 use_condaenv("data_analysis")
@@ -24,7 +30,9 @@ use_condaenv("data_analysis")
 ```
 
 # Utility functions
+
 Here are some R functions that will be used in the downstream analysis.
+
 ```{r}
 patches_to_pixels <- function(patch_img_arr, patchsize, remainder_1, remainder_2) {
   # deconvolve image with each point corresponding to a patch 
@@ -98,15 +106,16 @@ plot_2d_img_with_colorbar <- function(clustering_img, ...) {
 ```
 
 # Examples
+
 Load `NumPy` first.
+
 ```{r}
 np <- import("numpy")
 ```
 
-And let's check out the image we will analyse.
-```{r, fig.width=5, fig.height=5}
-library(png)
+And let's check out the image we are going to analyse.
 
+```{r, fig.width=5, fig.height=5}
 png_img <- readPNG("/home/sysbio/Downloads/tissue_lowres_image.png")
 
 # taken from https://cran.r-project.org/web/packages/png/png.pdf
@@ -131,9 +140,8 @@ if (exists("rasterImage")) { # can plot only in R 2.11.0 and higher
 
 ## No mask case
 
-Run `fastLBP` right on the image without using tissue mask.
+Run `fastLBP` right on the image without using a tissue mask. Set up the parameters first.
 
-Set up the parameters first.
 ```{python}
 import fastlbp_imbg as fastlbp
 radii = [1, 2, 3, 4, 5]
@@ -146,13 +154,13 @@ save_intermediate_results = False
 overwrite_output = True
 ```
 
-
 Then run the LBP calculation function from the efficient multi-radius LBP implementation package `fastlbp-imbg` :).
+
 ```{python}
-import numpy as np
-from PIL import Image
-import fastlbp_imbg as fastlbp
 import os
+import numpy as np
+
+from PIL import Image
 
 print(os.getcwd()) # to know where partial calculations are written
 
@@ -168,12 +176,14 @@ fastlbp.run_fastlbp(img_np, radii, npoints, patchsize, ncpus,
 ```
 
 Read the produced `fastLBP` result.
+
 ```{r}
 lbp_res <- np$load(py$outfile_name)
 dim(lbp_res)
 ```
 
-You can already explore individual features and notice outlines of the most prominent elements on the image.
+You can already explore individual features and notice outlines of the most prominent elements in the image.
+
 ```{r, fig.width=5, fig.height=5}
 image(lbp_res[, , 2])
 ```
@@ -195,14 +205,15 @@ First, let's decrease the feature space dimensionality using something simple, e
 lbp_pca <- prcomp(flattened_lbp_result, rank. = 15, scale. = TRUE)
 summary(lbp_pca)
 ```
-Let's run UMAP right now too.
+
+Let's run UMAP right now.
 
 ```{r}
-library(umap)
 lbp_umap <- umap(flattened_lbp_result)
 ```
 
-So we have PCA projections with 15 retained components and 2D UMAP embeddings.
+So we have PCA projections on 15 components and 2D UMAP embeddings.
+
 ```{r}
 lbp_umap_flattened <- lbp_umap$layout
 dim(lbp_umap_flattened)
@@ -211,8 +222,8 @@ lbp_pca_flattened <- lbp_pca$x
 dim(lbp_pca_flattened)
 ```
 
-
 Now we can do clustering. We'll stick to K-means with 3 clusters for the sake of simplicity.
+
 ```{r}
 lbp_pca_kmeans <- kmeans(lbp_pca_flattened, centers=3)
 lbp_umap_kmeans <- kmeans(lbp_umap_flattened, centers=3)
@@ -221,6 +232,7 @@ kmeans_umap_labels <- lbp_umap_kmeans$cluster
 ```
 
 The most enjoyable part - plotting the results!
+
 ```{r, fig.width=8, fig.height=8}
 plot(lbp_pca_flattened, col=kmeans_pca_labels, 
      main="K-means on PCA projections (first 2 components shown)")
@@ -229,20 +241,13 @@ plot(lbp_umap_flattened, col=kmeans_umap_labels,
      main="K-means on UMAP embeddings")
 ```
 
-
 To assess the clustering result directly on the image, we need to reshape 1D cluster labels back to the LBP result dimensions.
 
-```{r, fig.width=8, fig.height=5}
+```{r, fig.width=10, fig.height=6.5}
 
 clustering_img <- clustering_to_2d_img(kmeans_pca_labels, dim(lbp_res)[1],
                                        dim(lbp_res)[2])
-plot_2d_img_with_colorbar(clustering_img, main = "PCA result")
-
-
-clustering_img_umap <- clustering_to_2d_img(kmeans_umap_labels, dim(lbp_res)[1],
-                                       dim(lbp_res)[2])
-plot_2d_img_with_colorbar(clustering_img_umap, main = "UMAP result")
-
+plot_2d_img_with_colorbar(clustering_img, main = "K-means (3 clusters) + PCA (15 components) result")
 
 # # You can also plot results as raster images directly using image() function
 # # the plots will be without colorbars though
@@ -253,13 +258,20 @@ plot_2d_img_with_colorbar(clustering_img_umap, main = "UMAP result")
 # clustering_img_umap <- array(kmeans_umap_labels, dim=dim(lbp_res)[1:2])
 # image(clustering_img_umap)
 ```
+
+```{r, fig.width=10, fig.height=6.5}
+clustering_img_umap <- clustering_to_2d_img(kmeans_umap_labels, dim(lbp_res)[1],
+                                       dim(lbp_res)[2])
+plot_2d_img_with_colorbar(clustering_img_umap, main = "K-means (3 clusters) + UMAP result")
+```
+
 **Note** the clusters are "meaningless", so cluster `1` obtained using K-means clustering applied to PCA projections does not necessarily match cluster `1` obtained from UMAP embeddings. Hence please ignore color scheme inconsistency across different segmentation result plots.
 
 # Mask case
 
-Wee need to define some helper functions to obtain tissue mask from the image using Otsu thresholding. Then we will create the mask and run fastlbp using it.
-```{python}
+We need to define some helper functions to obtain tissue mask from the image using Otsu thresholding. Then we will create the mask and run fastlbp using it.
 
+```{python}
 from scipy import ndimage
 from skimage import filters
 
@@ -297,8 +309,6 @@ background_mask = get_otsu_mask(img_blurred)
 tissue_mask = ~background_mask
 
 
-import fastlbp_imbg as fastlbp
-
 # These are the same parameters as used above
 # but you can change them if you want to experiment
 radii = [1, 2, 3, 4, 5]
@@ -316,14 +326,15 @@ fastlbp.run_fastlbp(img_np, radii, npoints, patchsize, ncpus,
         img_mask=tissue_mask.astype(np.uint8), overwrite_output=overwrite_output)
 ```
 
-You can take a look on the tissue mask that we just got. This gives you the information about what region of the original image was subjected to the LBP calculation. Only patches from the masked region (marked with `True` or `1`) will be used in the downstream analysis as well.
+You can take a look at the tissue mask that we just got. This gives you information about what region of the original image was subjected to the LBP calculation. Only patches from the masked region (marked with `True` or `1`) will be used in the downstream analysis as well.
+
 ```{r, fig.width=8, fig.height=5}
 tissue_mask <- py$tissue_mask
 # image(tissue_mask)
-plot_2d_img_with_colorbar(tissue_mask)
+plot_2d_img_with_colorbar(tissue_mask, main = "Binary tissue mask")
 ```
 
-Load the new result and repeat the same analysis we carried out earlier in the no-mask scenario. However, before proceeding we need to get patch mask from our pixel mask to work with patches rather than with pixels. Essentially, we just need to downscale the mask.
+Load the new result and repeat the same analysis we carried out earlier in the no-mask scenario. However, before proceeding we need to get a patch mask from our pixel mask to work with patches rather than with pixels. Essentially, we just need to downscale the mask.
 
 ```{python}
 def downscale(
@@ -356,15 +367,16 @@ tissue_patch_mask = downscale_using_patchsize(tissue_mask, patchsize)
 tissue_patch_mask_uint8 = tissue_patch_mask.astype(np.uint8)
 ```
 
-Notice how patch mask is more pixelated than the pixel mask because of the downscaling.
+Notice how the patch mask is more pixelated than the pixel mask because of the downscaling.
+
 ```{r, fig.width=8, fig.height=5}
 tissue_patch_mask <- py$tissue_patch_mask
 tissue_patch_mask_uint8 <- py$tissue_patch_mask_uint8
 # image(tissue_mask)
-plot_2d_img_with_colorbar(tissue_patch_mask_uint8, main = "Binary tissue mask")
+plot_2d_img_with_colorbar(tissue_patch_mask_uint8, main = "Binary tissue mask (patch-level)")
 ```
 
-Read the LBP result obtained using mask.
+Read the LBP result calculated using the mask.
 
 ```{python}
 import numpy as np
@@ -426,23 +438,26 @@ plot(lbp_pca_flattened, col=kmeans_pca_labels, main = "K-means + PCA")
 plot(lbp_umap_flattened, col=kmeans_umap_labels, main = "K-means + UMAP")
 ```
 
-Let's examine the resulting segmentation using our helper function that supports visualization of masked arrays.
-```{r, fig.width=8, fig.height=5}
+Let's examine the resulting segmentation using our helper function that supportsthe visualisation of masked arrays.
+
+```{r, fig.width=10, fig.height=6.5}
 # Plot PCA result
 clustering_img <- clustering_to_2d_img(kmeans_pca_labels, dim(lbp_res)[1],
                                        dim(lbp_res)[2],
                                        mask=tissue_patch_mask_uint8)
-plot_2d_img_with_colorbar(clustering_img, main = "PCA result")
+plot_2d_img_with_colorbar(clustering_img, main = "K-means (3 clusters) + PCA (15 components) result")
+```
 
-
+```{r, fig.width=10, fig.height=6.5}
 # Plot UMAP result
 clustering_img_umap <- clustering_to_2d_img(kmeans_umap_labels, dim(lbp_res)[1],
                                        dim(lbp_res)[2],
                                        mask=tissue_patch_mask_uint8)
-plot_2d_img_with_colorbar(clustering_img_umap, main = "UMAP result")
+plot_2d_img_with_colorbar(clustering_img_umap, main = "K-means (3 clusters) + UMAP result")
 ```
 
 Our final images are still downsized. To upscale them back to the size of the original image, use the following utility function.
+
 ```{r}
 remainder_1 <- dim(png_img)[1] %% py$patchsize
 remainder_2 <- dim(png_img)[2] %% py$patchsize
