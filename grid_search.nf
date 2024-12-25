@@ -585,21 +585,64 @@ workflow LabelsToPatchImage {
 
 // // TODO: the most pressing part to refactor 
 
-// workflow GetTissueMask {
-//     take:
+workflow GetTissueMask {
+    take:
+    get_tissue_mask_inputs_channel
 
-//     main:
+    main:
+    get_tissue_mask(get_tissue_mask_inputs_channel)
 
-//     emit:
-// }
+    get_tissue_mask.out
+        .map { imgg, pixelmask -> pixelmask }
+        .set { pixel_mask_only }
 
-// workflow DownscaleImage {
-//     take:
+    emit:
+    img_and_pixel_mask = get_tissue_mask.out
+    pixel_mask_only
+}
 
-//     main:
 
-//     emit:
-// }
+
+workflow GetTissuePatchMask {
+    take:
+    get_tissue_mask_inputs_channel
+    lbp_combinations_hash_outdir
+
+    main:
+    GetTissueMask(get_tissue_mask_inputs_channel)
+    img_and_pixel_mask = GetTissueMask.out.img_and_pixel_mask
+    pixel_mask_only = GetTissueMask.out.pixel_mask_only
+
+    pixel_mask_only
+        .set { mask_for_report }
+
+    // combine the pixel mask with the lbp parameters channel
+    // to get the patchsize value which is needed to properly downscale 
+    // pixel mask into patch mask
+    img_and_pixel_mask
+        .combine(lbp_combinations_hash_outdir)
+        .map { imgg, pixelmask, lbp_outdir, lbp_params ->
+        tuple(lbp_outdir, imgg, pixelmask, getValueFromParamList(lbp_params, param_name = 'patchsize')) }
+        .set { downscale_me }
+
+    downscale_mask(downscale_me)
+
+    downscale_mask.out
+        .set { all_downscale_outputs }
+
+    downscale_mask.out
+        .combine(lbp_combinations_hash_outdir, by:0)
+        .combine(img_and_pixel_mask)
+        .map { downscale_outdir, patchmask_path, lbp_params, imgg, pixelmask_path ->
+        tuple(downscale_outdir, imgg, pixelmask_path, patchmask_path, lbp_params) }
+        .set { feed_me_into_lbp }
+
+    emit:
+    feed_me_into_lbp
+    all_downscale_outputs
+    mask_for_report
+
+}
 
 // workflow ConvertAnnotationsToBinmask {
 //     take:
@@ -741,36 +784,14 @@ workflow OtsuMaskWorkflow {
     main:
     infoLog("Otsu mask mode")
 
-    get_tissue_mask(tuple(params.img_path, params.background_color))
+    def img_and_background_color_channel = Channel.of(tuple(params.img_path, params.background_color))
 
-    get_tissue_mask.out
-        .set { pixel_mask_ch }
+    GetTissuePatchMask(img_and_background_color_channel, lbp_combinations_hash_outdir)
+    feed_me_into_lbp = GetTissuePatchMask.out.feed_me_into_lbp
+    all_downscale_outputs = GetTissuePatchMask.out.all_downscale_outputs
+    mask_for_report = GetTissuePatchMask.out.mask_for_report
 
-    get_tissue_mask.out
-        .map { imgg, pixelmask ->
-        pixelmask }
-        .toList()
-        .set { mask_for_report }
-
-    get_tissue_mask.out
-        .combine(lbp_combinations_hash_outdir)
-        .map { imgg, pixelmask, lbp_outdir, lbp_params ->
-        tuple(lbp_outdir, imgg, pixelmask, getValueFromParamList(lbp_params, param_name = 'patchsize')) }
-        .set {downscale_me}
-
-    downscale_mask(downscale_me)
-
-    downscale_mask.out
-        .set { all_downscale_outputs }
-
-    downscale_mask.out
-        .combine(lbp_combinations_hash_outdir, by:0)
-        .combine(pixel_mask_ch)
-        .map { downscale_outdir, patchmask_path, lbp_params, imgg, pixelmask_path ->
-        tuple(downscale_outdir, imgg, pixelmask_path, patchmask_path, lbp_params) }
-        .set { feed_me_into_lbp }
-
-    RunFastLBPAndPrepareForNextStep(feed_me_into_lbp)
+    RunFastLBPAndPrepareForNextStep(feed_me_into_lbp, umap_combinations_hash_outdir)
     all_lbp_outputs = RunFastLBPAndPrepareForNextStep.out.all_lbp_outputs
     feed_me_into_umap = RunFastLBPAndPrepareForNextStep.out.next_step_inputs_channel
     lbp_img = RunFastLBPAndPrepareForNextStep.out.lbp_result_img
@@ -780,43 +801,30 @@ workflow OtsuMaskWorkflow {
     all_umap_outputs = RunDimRedAndPrepareForNextStep.out.all_dimred_outputs
     feed_me_into_hdbscan = RunDimRedAndPrepareForNextStep.out.next_step_inputs_channel
 
-    clustering(feed_me_into_hdbscan)
-
-    clustering.out
-        .set { all_hdbscan_outputs }
+    RunClustering(feed_me_into_hdbscan)
+    all_hdbscan_outputs = RunClustering.out.all_clustering_outputs
 
     lbp_img
         .join(feed_me_into_lbp)
         .set { lbp_and_masks }
 
-    clustering.out
+    all_hdbscan_outputs
         .combine(lbp_and_masks)
         .filter { it[0].toString().contains(it[2].toString()) } // hdbscan_outdir, hdbscan_labels_path, lbp_outdir, lbp_img_path, img_path, pixelmask_path, patchmask_path, lbp_params
         .map { hdbscan_outdir, hdbscan_labels_path, lbp_outdir, lbp_img_path, img_path, pixelmask_path, patchmask_path, lbp_params ->
         tuple(hdbscan_outdir, hdbscan_labels_path, patchmask_path, lbp_img_path) }
         .set { convert_me_back_to_image }
 
-    labels_to_patch_img(convert_me_back_to_image)
+    LabelsToPatchImage(convert_me_back_to_image)
+    all_deconvolved_images_outputs = LabelsToPatchImage.out.all_deconvolved_images_outputs
 
-    labels_to_patch_img.out
-        .set { all_deconvolved_images_outputs }
+    AllCombinationsToHashes([all_downscale_outputs, all_lbp_outputs, 
+                             all_umap_outputs, all_hdbscan_outputs, 
+                             all_deconvolved_images_outputs])
+    data_to_save = AllCombinationsToHashes.out.data_to_save
+    dir_and_hash = AllCombinationsToHashes.out.dir_and_hash
 
-    all_downscale_outputs
-        .combine(all_lbp_outputs)
-        .combine(all_umap_outputs)
-        .combine(all_hdbscan_outputs)
-        .combine(all_deconvolved_images_outputs)
-        .filter { all_param_hashes_and_outputs ->
-            checkNestedParameterCombinations(all_param_hashes_and_outputs) } // there is additional step as compared to no mask 
-        .multiMap { downscale_outdirr, downscale_dataa, lbp_outdirr, lbp_dataa, umap_outdirr, umap_dataa, hdbscan_outdirr, hdbscan_dataa, 
-        deconvolve_outdirr, deconvolve_dataa ->
-        // replace commas with semicolons to distinguish between inner parameters list and
-        // outer combination-to-hash list 
-        data_to_save: tuple(deconvolve_outdirr.replaceAll(",", ";").md5(), tuple(downscale_dataa, lbp_dataa, umap_dataa, hdbscan_dataa, deconvolve_dataa))
-        dir_and_hash: tuple(deconvolve_outdirr.replaceAll(",", ";"), deconvolve_outdirr.replaceAll(",", ";").md5()) }
-        .set { final_data_and_folders }
-
-    final_data_and_folders.data_to_save
+    data_to_save
         .transpose()
         .map { params_hash, step_dataa ->
         tuple("${params.outdir}/${params_hash}", step_dataa) }
@@ -824,7 +832,7 @@ workflow OtsuMaskWorkflow {
 
     copy_files_to_target_dir(dirs_and_data_to_save)
 
-    final_data_and_folders.dir_and_hash
+    dir_and_hash
         .toList()
         .set { combinations_metadata }
 
