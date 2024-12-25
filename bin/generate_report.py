@@ -107,7 +107,7 @@ def render_template(img_path: str, runs_info: pd.DataFrame,
     # add grid only of csv file with cluster mapping was provided
     # TODO: change this behaviour?
     jaccard_grid_html = None
-    if class_mapping_csv:
+    if class_mapping_csv and integer_annot_path:
         clustering_imgs = runs_info['patch_img'].values.tolist()
         run_hashes = runs_info['hash'].values.tolist()
     
