@@ -358,11 +358,12 @@ def plot_jaccard_grid(img_path: str, annot_path: str, clustering_imgs: List[str]
     img = ut.read_img(img_path)
     annot = ut.read_img(annot_path)
 
-    # found experimentally, can't help but use a magic number
-    PRETTY_HEIGH_TO_WIDTH_RATIO = 45 / num_runs 
+    # found experimentally, the rationale is that each row subfigure contains 4 image plots
+    # TODO: find a better ratio?
+    PRETTY_HEIGHT_TO_WIDTH_RATIO = num_runs * 0.25
     
-    # fig, axs = plt.subplots(nrows=num_runs, ncols=4, figsize=(fig_width, fig_width * PRETTY_HEIGH_TO_WIDTH_RATIO)) # img, annot, clustering result, individual classes when their amount is fixed
-    fig = plt.figure(figsize=(fig_width, fig_width * PRETTY_HEIGH_TO_WIDTH_RATIO), constrained_layout=True)
+    # fig, axs = plt.subplots(nrows=num_runs, ncols=4, figsize=(fig_width, fig_width * PRETTY_HEIGHT_TO_WIDTH_RATIO)) # img, annot, clustering result, individual classes when their amount is fixed
+    fig = plt.figure(figsize=(fig_width, fig_width * PRETTY_HEIGHT_TO_WIDTH_RATIO), constrained_layout=True)
     subfigs = fig.subfigures(nrows=num_runs, ncols=1, hspace=.11)
     
     annot_values = np.unique(annot.ravel())
@@ -456,7 +457,7 @@ def plot_jaccard_grid(img_path: str, annot_path: str, clustering_imgs: List[str]
             unsup_clust_title = found_same_num_of_clusters_as_classes
 
         axs_row[2].set_title(f'Unsupervised Clustering\n{unsup_clust_title}')
-
+        # TODO: make discrete colorbar show actual number of clusters
         divider = make_axes_locatable(axs_row[2])
         cax = divider.append_axes('right', size='5%', pad=0.05)
         fig.colorbar(ax2, cax=cax, ticks=np.arange(clustering_result_min, clustering_result_max + 1),
