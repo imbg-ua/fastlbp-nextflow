@@ -6,7 +6,7 @@ include { infoLog;
           checkNestedParameterCombinations;
           getFinalOutdirFromParamsCombinations;
           getAllOutputFilesFromParamsCombinations;
-          createCombinations } from './lib/nf/utils'
+          createCombinations } from '../../lib/nf/utils'
 
 nextflow.enable.dsl = 2
 

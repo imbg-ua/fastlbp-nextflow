@@ -2,7 +2,7 @@
 
 include { infoLog; 
           checkNextflowVersion; 
-          getValueFromParamList } from './lib/nf/utils'
+          getValueFromParamList } from '../../lib/nf/utils'
 
 nextflow.enable.dsl = 2
 pipeline_version = "0.0.2"

@@ -1,22 +1,19 @@
-# Nextflow pipeline for LBP-based image segmentation
+# Nextflow pipeline for fastLBP-based image segmentation
 
 ## Key points
 The pipeline supports the following modes:
-- **GridSearch**, where you can specify lists of parameters for each step to run the pipeline using all possible combinations.
+- **GridSearch** which allows you to specify lists of parameters for each step to run the pipeline using all possible combinations.
 - **SingleImage** to process a single image.
 - **MultiImage** to process a folder of images.
 
+## Requirements
+**(to be completed)**
+
 ## How to use
 
-### Find best parameters combinations
-To launch in the **GridSearch** mode, use the corresponding template `grid_search_template.yaml` and type:
+Choose a template from the `templates/` folder and run
 ```bash
-nextflow run grid_search.nf -profile conda -params-file templates/grid_search_template.yaml -entry Pipeline
+nextflow run main.nf -profile conda -params-file templates/grid_search_template.yaml
 ```
 
-### Just process my images
-
-To run in either **SingleImage** or **MultiImage** mode, choose the corresponding template (e.g. `single_image.yaml`) and run:
-```bash
-nextflow run normal.nf -profile conda -params-file templates/single_image.yaml -entry Pipeline
-```
+The workflow will automatically determine the execution mode based on the template structure.
