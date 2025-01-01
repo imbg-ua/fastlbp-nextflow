@@ -24,6 +24,35 @@ from typing import List
 
 PLOTTING_BACKENDS = ('matplotlib', 'plotly')
 
+# TODO: change `discrete image` to `label image`
+def shrink_discrete_img_to_uniform_range(img_arr: np.array) -> np.array:
+    """Remap values in an image with integer labels to a uniform range `[0, n]` where
+    `n` is the total number of unique values.
+    """
+
+    all_values = np.unique(img_arr)
+
+    img_arr_uniform = np.empty(shape=(img_arr.shape[0], img_arr.shape[1]), dtype=np.uint16)
+    for idx, val in enumerate(all_values):
+        val_mask = img_arr == val
+        img_arr_uniform[val_mask] = idx
+
+    return img_arr_uniform, all_values
+
+# TODO: improve function naming
+def plot_img_discrete_uniform_and_create_colorbar_axis(img_arr: np.array, ax: mpl.axes.Axes, cmap: mpl.colors.Colormap = 'viridis'):
+    img_arr_uniform, all_values = shrink_discrete_img_to_uniform_range(img_arr)
+    total_values_num = len(all_values)
+    cmap = plt.get_cmap('viridis', total_values_num) # cmap restricted to the total number of clusters
+
+    # set limits 0.5 outside the true range
+    img = ax.imshow(img_arr_uniform, cmap=cmap, vmin=-.5, vmax=total_values_num - .5)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes('right', size='5%', pad=0.05) # TODO: make tuneable
+
+    return img, cax, all_values
+
+# TODO: replace and/or combine with `plot_img_discrete_uniform_and_create_colorbar_axis()`
 # generic function to plot images with discrete colorbars
 def plot_img_discrete(img_arr: np.array, figsize: tuple=(8, 8)):
     """
@@ -43,7 +72,7 @@ def plot_img_discrete(img_arr: np.array, figsize: tuple=(8, 8)):
         Figure with the displayed image.
     """
     # get discrete colormap
-    img_arr = img_arr.copy().astype('int')
+    img_arr = img_arr.copy().astype('int') # TODO: don't copy
     all_values = np.unique(img_arr)
     total_clust_num = len(all_values)
     cmap = plt.get_cmap('viridis', total_clust_num) # cmap restricted to the total number of clusters
@@ -52,18 +81,11 @@ def plot_img_discrete(img_arr: np.array, figsize: tuple=(8, 8)):
     # FIXME: remap cluster values to a uniform range to simplify visualization and not 
     # implement a custom colormap normalization method
     # TODO: implement a custom colormap normalization method
-
+    # TODO: use `shrink_discrete_img_to_uniform_range()` function
     img_arr_uniform = np.empty(shape=(img_arr.shape[0], img_arr.shape[1]), dtype=np.uint16)
     for idx, val in enumerate(all_values):
         val_mask = img_arr == val
         img_arr_uniform[val_mask] = idx        
-
-    # TODO: fix this
-    """
-    RuntimeWarning: More than 20 figures have been opened. Figures created through the pyplot interface 
-    (`matplotlib.pyplot.figure`) are retained until explicitly closed and may consume too much memory. 
-    (To control this warning, see the rcParam `figure.max_open_warning`). Consider using `matplotlib.pyplot.close()`.
-    """
 
     # set limits 0.5 outside the true range
     img = ax.imshow(img_arr_uniform, cmap=cmap, vmin=-.5, vmax=total_clust_num - .5)
@@ -444,7 +466,7 @@ def plot_jaccard_grid(img_path: str, annot_path: str, clustering_imgs: List[str]
         axs_row[2].axis("off")
 
         # indicate how many clusters there were before remapping to match annotations
-        num_found_clusters = len(np.unique(clustering_result_img.ravel()))
+        num_found_clusters = len(clustering_result_unique)
         found_less_clusters_than_classes = f'A total of {total_num_found_clusters - 1} clusters were found' # without background
         found_same_num_of_clusters_as_classes = f'Found {total_num_found_clusters - 1} clusters with the following matching'
         found_more_clusters_than_classes = f'Showing top {num_found_clusters - 1} clusters out of {total_num_found_clusters - 1}'
