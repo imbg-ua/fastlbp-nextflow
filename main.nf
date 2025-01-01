@@ -1,11 +1,13 @@
 #!/usr/bin/env/ nextflow
 
-include { info_log; check_nextflow_version; get_value_from_param_list } from 'lib/nf/utils'
+include { infoLog; 
+          checkNextflowVersion; 
+          getValueFromParamList } from './lib/nf/utils'
 
 nextflow.enable.dsl = 2
 pipeline_version = "0.0.2"
 
-check_nextflow_version()
+checkNextflowVersion()
 
 // params.annot_suffix = "annotation"
 
@@ -214,7 +216,7 @@ workflow SingleImage {
         get_tissue_mask.out
             .combine([[lbp_params]])
             .map { img, pixelmask, lbp_params_list_cur ->
-            tuple(img, pixelmask, get_value_from_param_list(lbp_params_list_cur, "patchsize"))}
+            tuple(img, pixelmask, getValueFromParamList(lbp_params_list_cur, "patchsize"))}
             .set { downscale_me }
         
         downscale_mask(downscale_me)
@@ -268,7 +270,7 @@ workflow SingleImage {
         img_and_mask
             .combine([[lbp_params]])
             .map { img, annot, lbp_params_list_cur ->
-            tuple(img, annot, get_value_from_param_list(lbp_params_list_cur, "patchsize")) }
+            tuple(img, annot, getValueFromParamList(lbp_params_list_cur, "patchsize")) }
             .set { downscale_me }
 
         downscale_mask(downscale_me)
@@ -318,7 +320,7 @@ workflow OtsuWorkflow {
     get_tissue_mask.out
         .combine([[lbp_params]])
         .map { img, pixelmask, lbp_params_list_cur ->
-        tuple(img, pixelmask, get_value_from_param_list(lbp_params_list_cur, "patchsize"))}
+        tuple(img, pixelmask, getValueFromParamList(lbp_params_list_cur, "patchsize"))}
         .set { downscale_me }
     
     downscale_mask(downscale_me)
@@ -466,7 +468,7 @@ workflow MultiImage {
         
         convert_annotations_to_binmask.out
             .map { imgg, binmaskk ->
-            tuple(imgg, binmaskk,  get_value_from_param_list(lbp_params)) }
+            tuple(imgg, binmaskk,  getValueFromParamList(lbp_params)) }
             .set { downscale_me_with_mask }
         
         ProvidedMaskWorkflow(downscale_me_with_mask)
@@ -536,7 +538,7 @@ workflow MultiImage {
             get_tissue_mask.out
                 .combine([[lbp_params]])
                 .map { img, pixelmask, lbp_params_list_cur ->
-                tuple(img, pixelmask, get_value_from_param_list(lbp_params_list_cur, "patchsize"))}
+                tuple(img, pixelmask, getValueFromParamList(lbp_params_list_cur, "patchsize"))}
                 .set { downscale_me }
 
             downscale_mask(downscale_me)
@@ -583,7 +585,7 @@ workflow MultiImage {
                 }
                 .combine([[lbp_params]])
                 .map { img, pixelmask, lbp_params_list_cur ->
-                tuple(img, pixelmask, get_value_from_param_list(lbp_params_list_cur, "patchsize"))}
+                tuple(img, pixelmask, getValueFromParamList(lbp_params_list_cur, "patchsize"))}
                 .set { downscale_me }
 
             downscale_mask(downscale_me)
