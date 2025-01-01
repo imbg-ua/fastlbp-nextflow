@@ -18,5 +18,5 @@ nextflow run grid_search.nf -profile conda -params-file templates/grid_search_te
 
 To run in either **SingleImage** or **MultiImage** mode, choose the corresponding template (e.g. `single_image.yaml`) and run:
 ```bash
-nextflow run main.nf -profile conda -params-file templates/single_image.yaml -entry Pipeline
+nextflow run normal.nf -profile conda -params-file templates/single_image.yaml -entry Pipeline
 ```
