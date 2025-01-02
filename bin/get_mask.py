@@ -42,6 +42,7 @@ def check_annotations(annotations: str, background_val_str: str = "", savefile: 
     if len(annot.shape) > 2:
         tissue_mask = annot_to_tissue_binmask(annot, background_val)
     elif len(annot.shape) == 2:
+        # TODO: use annot_to_tissue_binmask() as it covers this case as well
         tissue_mask = annot
     else:
         raise ValueError('Annnotations shape is not valid.')

@@ -4,7 +4,7 @@
 
 
 process fastlbp {
-    debug debug_flag
+    debug params.debug_flag
     tag "fastlbp"
     // publishDir "${step_outdir}", mode: "copy"
 

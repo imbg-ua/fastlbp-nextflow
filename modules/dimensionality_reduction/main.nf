@@ -3,7 +3,7 @@
 
 
 process dimred {
-    debug debug_flag
+    debug params.debug_flag
     tag "${params.args.dimred.method}"
     // publishDir "${step_outdir}", mode: "copy"
 
