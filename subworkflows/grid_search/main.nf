@@ -8,12 +8,20 @@ include { infoLog;
           getAllOutputFilesFromParamsCombinations;
           createCombinations } from '../../lib/nf/utils'
 
+include { RunFastLBP;
+          RunFastLBPAndPrepareForNextStep } from '../../modules/feature_extraction'
+include { RunDimRed;
+          RunDimRedAndPrepareForNextStep } from '../../modules/dimensionality_reduction'
+include { RunClustering } from '../../modules/clustering'
+
+
 nextflow.enable.dsl = 2
 
 pipeline_version = "0.0.2"
 
 // Default params
 // TODO: move to config
+// TODO: move before include statements
 params.background_color = ""
 params.pairs_max_csv = 'pairs_max_jacc.csv'
 // params.pairs_max_csv = '' // TODO: BUG: Make dependent oт the availability of annotaitons
@@ -123,72 +131,6 @@ process downscale_mask {
         --img_path ${pixelmask} \
         --patchsize ${patchsize} \
         --savefile ${patchmask_savefile}
-    """
-}
-
-process fastlbp {
-    debug debug_flag
-    tag "fastlbp"
-    // publishDir "${step_outdir}", mode: "copy"
-
-    input:
-    tuple val(step_outdir), path(img), path(mask), path(patchmask), val(params_str)
-
-    output:
-    tuple val(step_outdir), path("data"), emit: lbp_data_folder
-    tuple val(step_outdir), path("data/out/${file(params.constargs.lbp.outfile_name).getBaseName()}_flattened.npy"), emit: lbp_result_file_flattened
-    tuple val(step_outdir), path("data/out/${file(params.constargs.lbp.outfile_name).getBaseName()}.npy"), emit: lbp_result_file_img
-
-    script:
-    mask_path = mask ? "--img_mask ${mask}" : ""
-    patchmask_path = patchmask ? "--patch_mask ${patchmask}" : ""
-    """
-    run_lbp.py main_grid_search \
-        --img_path ${img} \
-        --params_str "${params_str}" \
-        --ncpus ${params.constargs.lbp.ncpus} \
-        --outfile_name ${params.constargs.lbp.outfile_name} \
-        ${mask_path} \
-        ${patchmask_path} \
-        --img_name ${params.constargs.lbp.img_name}
-    """
-}
-
-process dimred {
-    debug debug_flag
-    tag "${params.args.dimred.method}"
-    // publishDir "${step_outdir}", mode: "copy"
-
-    input:
-    tuple val(step_outdir), path(lbp_result_flattened), val(params_str)
-
-    output:
-    tuple val(step_outdir), path("embeddings.npy")
-
-    script:
-    """
-    run_dimensionality_reduction.py \
-        --np_data_path ${lbp_result_flattened} \
-        --params_str "${params_str}"
-    """
-}
-
-process clustering {
-    debug debug_flag
-    tag "${params.args.clustering.method}"
-    // publishDir "${step_outdir}", mode: "copy"
-
-    input:
-    tuple val(step_outdir), path(data), val(params_str)
-
-    output:
-    tuple val(step_outdir), path("clustering_labels.npy")
-
-    script:
-    """
-    run_clustering.py \
-        --np_data_path ${data} \
-        --params_str "${params_str}"
     """
 }
 
@@ -342,86 +284,6 @@ workflow ParameterCombinationsToMap {
     parameter_combinations_map
 }
 
-workflow RunFastLBP {
-    take:
-    fastlbp_inputs_channel
-
-    main:
-    fastlbp(fastlbp_inputs_channel)
-
-    emit:
-    all_lbp_outputs = fastlbp.out.lbp_data_folder
-    lbp_result_flattened = fastlbp.out.lbp_result_file_flattened
-    lbp_result_img = fastlbp.out.lbp_result_file_img
-}
-
-workflow RunFastLBPAndPrepareForNextStep {
-    take:
-    fastlbp_inputs_channel
-    next_step_combinations_map
-
-    main:
-    RunFastLBP(fastlbp_inputs_channel)
-
-    all_lbp_outputs = RunFastLBP.out.all_lbp_outputs
-    lbp_result_flattened = RunFastLBP.out.lbp_result_flattened
-    lbp_result_img = RunFastLBP.out.lbp_result_img
-
-    lbp_result_flattened
-        .combine(next_step_combinations_map)
-        .map { lbp_outdir, lbp_result_flattened_cur, next_step_params_str, next_step_params ->
-        tuple("${lbp_outdir}/${next_step_params_str}", lbp_result_flattened_cur, next_step_params) }
-        .set {next_step_inputs_channel}
-
-    emit:
-    all_lbp_outputs
-    next_step_inputs_channel
-    lbp_result_img
-}
-
-// shorthand for Dimensinality Reduction
-workflow RunDimRed {
-    take:
-    dimred_inputs_channel
-
-    main:
-    dimred(dimred_inputs_channel)
-
-    emit:
-    all_dimred_outputs = dimred.out
-}
-
-workflow RunDimRedAndPrepareForNextStep {
-    take:
-    dimred_inputs_channel
-    next_step_combinations_map
-
-    main:
-    RunDimRed(dimred_inputs_channel)
-
-    all_dimred_outputs = RunDimRed.out.all_dimred_outputs
-
-    all_dimred_outputs
-        .combine(next_step_combinations_map)
-        .map { dimred_outdir, embeddings, next_step_params_str, next_step_params ->
-        tuple("${dimred_outdir}/${next_step_params_str}", embeddings, next_step_params) }
-        .set { next_step_inputs_channel }
-
-    emit:
-    all_dimred_outputs
-    next_step_inputs_channel
-}
-
-workflow RunClustering {
-    take:
-    clustering_inputs_channel
-
-    main:
-    clustering(clustering_inputs_channel)
-
-    emit:
-    all_clustering_outputs = clustering.out
-}
 
 workflow LabelsToPatchImage {
     take:
@@ -435,7 +297,6 @@ workflow LabelsToPatchImage {
     all_deconvolved_images_outputs = labels_to_patch_img.out
 }
 
-// // TODO: the most pressing part to refactor 
 
 workflow GetTissueMask {
     take:
@@ -567,14 +428,6 @@ workflow AllCombinationsToHashes {
     data_to_save = final_data_and_folders.data_to_save
     dir_and_hash = final_data_and_folders.dir_and_hash
 }
-
-// workflow MoveDataToOutdir {
-//     take:
-
-//     main:
-
-//     emit:
-// }
 
 workflow NoMaskWorkflow {
 

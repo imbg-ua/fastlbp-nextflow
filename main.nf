@@ -1,5 +1,10 @@
 #!/usr/bin/env/ nextflow
 
+// TODO: nested arguments are not correctly overriden by the parameters file?
+// params.args.clustering.method = 'k_means' // default clustering method
+params.debug_flag = true
+
+
 include { checkNextflowVersion } from './lib/nf/utils'
 
 // TODO: change module file names

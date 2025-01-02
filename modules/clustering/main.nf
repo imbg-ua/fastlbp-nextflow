@@ -3,8 +3,8 @@
 // TODO: add workflows for the case when clustering is not the final step
 // (RunClusteringAndPrepareForNextStep)
 
-params.args.clustering.method = 'k_means' // default clustering method
-params.debug_flag = true
+// params.args.clustering.method = 'k_means' // default clustering method
+// params.debug_flag = true
 
 // uses image basename as run id
 process clustering_publish {
@@ -27,7 +27,7 @@ process clustering_publish {
 }
 
 process clustering {
-    debug debug_flag
+    debug params.debug_flag
     tag "${params.args.clustering.method}"
 
     input:
