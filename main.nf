@@ -3,13 +3,14 @@
 // TODO: nested arguments are not correctly overriden by the parameters file?
 // params.args.clustering.method = 'k_means' // default clustering method
 params.debug_flag = true
-
+params.mode = 'grid' // [normal, lbp_only]
 
 include { checkNextflowVersion } from './lib/nf/utils'
 
 // TODO: change module file names
 include { Pipeline as GridPipeline } from './subworkflows/grid_search'
-include { Pipeline as NormalPipeline } from './subworkflows/normal'
+include { Pipeline as NormalPipeline;
+          MultiImageLBP } from './subworkflows/normal'
 
 nextflow.enable.dsl = 2
 
@@ -34,9 +35,14 @@ checkNextflowVersion()
 // entry point for the whole tool
 workflow {
     // TODO: choose better mode selection condition
-    if ( params.constargs ) {
+    if ( params.mode == 'grid' ) {
+
         GridPipeline()
-    } else {
+    } else if ( params.mode == 'lbp_only' ) {
+
+        MultiImageLBP()
+    } else if ( params.mode == 'normal' ) {
+
         NormalPipeline()
     }
 }

@@ -35,7 +35,7 @@ def run_lbp(
     ncpus: int = 1, 
     img_mask: str = None,
     patch_mask: str = None, 
-    outfile_name: str = 'lbp_result.py', 
+    outfile_name: str = 'lbp_result.npy', 
     img_name: str = 'lbp_result', 
     save_intermediate_results: bool = True) -> None:
 
@@ -94,14 +94,20 @@ def main_grid_search(
 def main(
     img_path: str,
     params_str: str,
+    ncpus: int = 1,
     img_mask: str = None,
     patch_mask: str = None,
+    outfile_name: str = 'lbp_result.py', 
+    img_name: str = 'lbp_result',
     save_intermediate_results: bool = True) -> None:
 
     params_dict = ut.parse_params_str(params_str)
     run_lbp(img_path=img_path,
+            ncpus=ncpus,
             img_mask=img_mask,
             patch_mask=patch_mask,
+            outfile_name=outfile_name, 
+            img_name=img_name,
             save_intermediate_results=save_intermediate_results,
             **params_dict)
 

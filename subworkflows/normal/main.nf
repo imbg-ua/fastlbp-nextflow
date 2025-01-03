@@ -1,8 +1,22 @@
 #!/usr/bin/env/ nextflow
 
+
+
+params.fair = true
+
+// TODO refactor and set default values for all required params
+// params.args.lbp.ncpus = 10
+params.args = [:]
+params.args.lbp = [:]
+params.args.lbp.outfile_name = 'lbp_module_result.npy'
+params.args.lbp.img_name = 'lbp_module_result_img_name'
+params.args.lbp.ncpus = 10
+// params.args.lbp.img_name = 'lbp_module_result'
+
 include { infoLog; 
           checkNextflowVersion; 
-          getValueFromParamList } from '../../lib/nf/utils'
+          getValueFromParamList;
+          get_param_value_from_param_str } from '../../lib/nf/utils'
 
 nextflow.enable.dsl = 2
 pipeline_version = "0.0.2"
@@ -12,18 +26,10 @@ checkNextflowVersion()
 // params.annot_suffix = "annotation"
 
 
-
-// TODO: update to new config format (as used in grid_search.nf)
-def params_args_list = params.args.collect { k, v -> [k, v] }
-
-def lbp_params = params.args.lbp.collect { k, v -> [k, v] }
-def umap_params = params.args.dimred.collect { k, v -> [k, v] }
-def hdbscan_params = params.args.clustering.collect { k, v -> [k, v] }
-
-
 process convert_annotations_to_binmask {
     tag "mask preprocessing"
     debug params.debug_flag
+    fair params.fair
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
@@ -47,6 +53,7 @@ process convert_annotations_to_binmask {
 process get_tissue_mask {
     tag "${img_id}"
     debug params.debug_flag
+    fair params.fair
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
@@ -68,6 +75,7 @@ process get_tissue_mask {
 process downscale_mask {
     tag "${img_id}"
     debug params.debug_flag
+    fair params.fair
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
@@ -89,6 +97,7 @@ process downscale_mask {
 
 process fastlbp {
     tag "${img_id}"
+    fair params.fair
     debug params.debug_flag
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
@@ -108,14 +117,18 @@ process fastlbp {
     run_lbp.py main \
         --img_path ${img} \
         --params_str "${params_str}" \
+        --ncpus ${params.args.lbp.ncpus} \
+        --outfile_name ${params.args.lbp.outfile_name} \
         ${mask_path} \
-        ${patchmask_path}
+        ${patchmask_path} \
+        --img_name ${params.args.lbp.img_name}
     """
 }
 
 process dimred {
     tag "${img_id}"
     debug params.debug_flag
+    fair params.fair
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
@@ -135,6 +148,7 @@ process dimred {
 process clustering {
     tag "${img_id}"
     debug params.debug_flag
+    fair params.fair
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
@@ -154,6 +168,7 @@ process clustering {
 process labels_to_patch_img {
     tag "${img_id}"
     debug params.debug_flag
+    fair params.fair
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
@@ -434,6 +449,78 @@ workflow ProvidedMaskWorkflow {
 
 }
 
+workflow MultiImageLBP {
+
+    def lbp_runs_tsv = Channel.fromPath(params.lbp_runs_tsv)
+    lbp_runs_tsv
+        .splitCsv(header:true, sep:'\t')
+        .map { row -> tuple( row.image, row.mask, row.background_color, row.lbp_params_str)
+        }
+        .set{ lbp_runs_params }
+
+    lbp_runs_params
+        .branch { 
+            without_mask: (it[1] == "" || it[1] == "no")
+                return tuple(it[0], it[3]) // (image, lbp_params_str)
+            otsu_mask: it[1] == "auto"
+                return it // the whole tuple
+            with_mask: (it[1] != "" && it[1] != "no")
+                return it // the whole tuple
+        }
+        .set { lbp_runs_params_split_by_mask }
+
+
+    // ------------------------- //
+    // process images with masks //
+    // ------------------------- //
+    lbp_runs_params_split_by_mask.with_mask
+        .multiMap { image, mask, background_color, lbp_params_str ->
+            convert_to_binmask_ch: tuple(image, mask, background_color)
+            lbp_params_ch: lbp_params_str
+        }
+        .set { convert_me_to_binmask }
+    
+    convert_annotations_to_binmask(convert_me_to_binmask.convert_to_binmask_ch)
+    
+    // patchsize parameter value from parameter string extraction pattern
+    def patchsize_pattern = /patchsize, (\d+)/
+
+    convert_annotations_to_binmask.out
+        .merge(convert_me_to_binmask.lbp_params_ch)
+        .map { imgg, binmaskk, lbp_params_strr ->
+        tuple(imgg, binmaskk, get_param_value_from_param_str(lbp_params_strr, patchsize_pattern)) }
+        .set { downscale_me_with_mask }
+    
+    downscale_mask(downscale_me_with_mask)
+
+    downscale_mask.out
+        .merge(convert_me_to_binmask.lbp_params_ch)
+        .set { feed_me_into_lbp }
+
+    fastlbp(feed_me_into_lbp)
+
+    // // ---------------------------- //
+    // // process images without masks //
+    // // ---------------------------- //
+    // imgs_and_masks_ch_split.without_mask
+    //     .map { imgg -> 
+    //     tuple(imgg, [], [], lbp_params) }
+    //     .set { imgs_to_feed_into_lbp }
+    // NoMaskWorkFlow(imgs_to_feed_into_lbp)
+
+    // // ---------------------------------- //
+    // // process images using Otsu's method //
+    // // ---------------------------------- //
+    // imgs_and_masks_ch_split.otsu_mask
+    //     .map { imgg, mask_mode_auto, bg_shade ->
+    //     tuple(imgg, bg_shade) }
+    //     .set { imgs_to_get_masks }
+    // OtsuWorkflow(imgs_to_get_masks)
+}
+
+
+
+
 // TODO: organize repetitive code into workflows
 workflow MultiImage {
 
@@ -628,6 +715,13 @@ workflow MultiImage {
 }
 
 workflow Pipeline {
+    // TODO: update to new config format (as used in grid_search.nf)
+    params_args_list = params.args.collect { k, v -> [k, v] }
+
+    lbp_params = params.args.lbp.collect { k, v -> [k, v] }
+    umap_params = params.args.dimred.collect { k, v -> [k, v] }
+    hdbscan_params = params.args.clustering.collect { k, v -> [k, v] }
+
     if ( params.img_path && !params.imgs_dir )
         SingleImage()
     else

@@ -201,3 +201,10 @@ def createCombinations(method_params) {
     // TODO: the method above produces duplicates, urgently need optimisation
     return all_combs_final.distinct() // TODO: optimise this
 }
+
+
+def get_param_value_from_param_str(input_str, pattern) {
+    def matcher = input_str =~ pattern
+    matcher.find()
+    return matcher.group(1)
+}

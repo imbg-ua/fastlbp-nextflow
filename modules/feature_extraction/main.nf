@@ -2,6 +2,10 @@
 
 // TODO: add default parameter values here
 
+// params.constargs.lbp.ncpus = 10
+// params.constargs.lbp.outfile_name = 'lbp_module_result.npy'
+// params.constargs.lbp.img_name = 'lbp_module_result'
+
 
 process fastlbp {
     debug params.debug_flag
