@@ -11,9 +11,21 @@ The pipeline supports the following modes:
 
 ## How to use
 
-Choose a template from the `templates/` folder and run
+Choose a `grid` mode template from the `templates/` folder and run:
 ```bash
-nextflow run main.nf -profile conda -params-file templates/grid_search_template.yaml
+nextflow run main.nf -profile conda --mode grid -params-file templates/grid_search_template.yaml
+```
+
+To run the workflow in `Single Image` or `Multi Image` mode, change the `--mode` flag and provide the appropriate template file:
+```bash
+nextflow run main.nf -profile conda --mode normal -params-file templates/multiple_images.yaml
 ```
 
 The workflow will automatically determine the execution mode based on the template structure.
+
+### Run only fastLBP
+
+To process images with fastLBP only, check out the structure required for the `TSV` file with input parameters and run:
+```bash
+nextflow run main.nf -profile conda --mode lbp_only --lbp_runs_tsv modules/feature_extraction/lbp_only_template.tsv
+```

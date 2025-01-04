@@ -1,0 +1,6 @@
+image	mask	background_color	lbp_params_str
+/path/to/image_1	/path/to/annotations_1	[255, 255, 255]	[[param1, va1], [param2, val2]]
+/path/to/image_2	/path/to/annotations_2	[255, 255, 255]	[[param1, va1], [param2, val2]]
+/path/to/image_3	no	[0]	[[param1, va1], [param2, val2]]
+/path/to/image_4	auto	light	[[param1, va1], [param2, val2]]
+/path/to/image_5	auto	dark	[[param1, va1], [param2, val2]]
