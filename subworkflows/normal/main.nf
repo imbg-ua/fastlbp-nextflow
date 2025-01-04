@@ -1,8 +1,11 @@
 #!/usr/bin/env/ nextflow
 
 
-
-params.fair = true
+// fair execution is needed for the LBP-only mode
+fair = false
+if ( params.mode == 'lbp_only' ) {
+    fair = true
+}
 
 // TODO refactor and set default values for all required params
 // params.args.lbp.ncpus = 10
@@ -12,6 +15,13 @@ params.args.lbp.outfile_name = 'lbp_module_result.npy'
 params.args.lbp.img_name = 'lbp_module_result_img_name'
 params.args.lbp.ncpus = 10
 // params.args.lbp.img_name = 'lbp_module_result'
+
+// TODO: update to new config format (as used in grid_search.nf)
+params_args_list = params.args.collect { k, v -> [k, v] }
+
+lbp_params = params.args.lbp.collect { k, v -> [k, v] }
+umap_params = params.args.dimred.collect { k, v -> [k, v] }
+hdbscan_params = params.args.clustering.collect { k, v -> [k, v] }
 
 include { infoLog; 
           checkNextflowVersion; 
@@ -29,7 +39,7 @@ checkNextflowVersion()
 process convert_annotations_to_binmask {
     tag "mask preprocessing"
     debug params.debug_flag
-    fair params.fair
+    fair fair
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
@@ -53,7 +63,7 @@ process convert_annotations_to_binmask {
 process get_tissue_mask {
     tag "${img_id}"
     debug params.debug_flag
-    fair params.fair
+    fair fair
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
@@ -75,7 +85,7 @@ process get_tissue_mask {
 process downscale_mask {
     tag "${img_id}"
     debug params.debug_flag
-    fair params.fair
+    fair fair
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
@@ -97,7 +107,7 @@ process downscale_mask {
 
 process fastlbp {
     tag "${img_id}"
-    fair params.fair
+    fair fair
     debug params.debug_flag
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
@@ -128,7 +138,7 @@ process fastlbp {
 process dimred {
     tag "${img_id}"
     debug params.debug_flag
-    fair params.fair
+    fair fair
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
@@ -148,7 +158,7 @@ process dimred {
 process clustering {
     tag "${img_id}"
     debug params.debug_flag
-    fair params.fair
+    fair fair
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
@@ -168,7 +178,7 @@ process clustering {
 process labels_to_patch_img {
     tag "${img_id}"
     debug params.debug_flag
-    fair params.fair
+    fair fair
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
@@ -449,6 +459,10 @@ workflow ProvidedMaskWorkflow {
 
 }
 
+// TODO: this doesn't allow processing same images with different lbp parameters
+// well, it allows, but the outdirs are the same and outputs for different runs interfere 
+// and get overwritten by each other. To fix this, need to create run hashes and save outputs 
+// similarly to the grid search mode
 workflow MultiImageLBP {
 
     def lbp_runs_tsv = Channel.fromPath(params.lbp_runs_tsv)
@@ -491,31 +505,69 @@ workflow MultiImageLBP {
         tuple(imgg, binmaskk, get_param_value_from_param_str(lbp_params_strr, patchsize_pattern)) }
         .set { downscale_me_with_mask }
     
-    downscale_mask(downscale_me_with_mask)
+    // downscale_mask(downscale_me_with_mask)
 
+    // downscale_mask.out
+    //     .merge(convert_me_to_binmask.lbp_params_ch)
+    //     .set { feed_me_into_lbp }
+
+    // fastlbp(feed_me_into_lbp)
+
+    // ---------------------------- //
+    // process images without masks //
+    // ---------------------------- //
+    lbp_runs_params_split_by_mask.without_mask
+        .map { image, lbp_params_str ->
+        tuple(image, [], [], lbp_params_str) }
+        .set { feed_me_into_lbp_no_mask }
+
+    // fastlbp(feed_me_into_lbp_no_mask)
+
+    // ---------------------------------- //
+    // process images using Otsu's method //
+    // ---------------------------------- //
+
+    lbp_runs_params_split_by_mask.otsu_mask
+        .multiMap { image, mask, background_color, lbp_params_str ->
+            get_otsu_mask_ch: tuple(image, background_color)
+            lbp_params_otsu_ch: lbp_params_str
+        }
+        .set { img_to_get_masks }
+
+    get_tissue_mask(img_to_get_masks.get_otsu_mask_ch)
+
+    get_tissue_mask.out
+        .merge(img_to_get_masks.lbp_params_otsu_ch)
+        .map { imgg, binmaskk, lbp_params_strr ->
+        tuple(imgg, binmaskk, get_param_value_from_param_str(lbp_params_strr, patchsize_pattern)) }
+        .set { downscale_me_otsu }
+    
+    // downscale_mask(downscale_me_otsu)
+
+    // downscale_mask.out
+    //     .merge(img_to_get_masks.lbp_params_otsu_ch)
+    //     .set { feed_me_into_lbp_otsu }
+
+
+    // downscale provided masks and otsu masks and create a combined channel with fastlbp inputs
+
+    downscale_me_otsu.concat(downscale_me_with_mask)
+        .set { downscale_me_otsu_and_with_mask }
+
+    img_to_get_masks.lbp_params_otsu_ch.concat(convert_me_to_binmask.lbp_params_ch)
+        .set { lbp_params_str_otsu_and_with_mask }
+
+    downscale_mask(downscale_me_otsu_and_with_mask)
     downscale_mask.out
-        .merge(convert_me_to_binmask.lbp_params_ch)
-        .set { feed_me_into_lbp }
+        .merge(lbp_params_str_otsu_and_with_mask)
+        .set { feed_me_into_lbp_otsu_and_with_mask } 
 
-    fastlbp(feed_me_into_lbp)
 
-    // // ---------------------------- //
-    // // process images without masks //
-    // // ---------------------------- //
-    // imgs_and_masks_ch_split.without_mask
-    //     .map { imgg -> 
-    //     tuple(imgg, [], [], lbp_params) }
-    //     .set { imgs_to_feed_into_lbp }
-    // NoMaskWorkFlow(imgs_to_feed_into_lbp)
+    // fastlbp
+    feed_me_into_lbp_no_mask.concat(feed_me_into_lbp_otsu_and_with_mask)
+        .set { all_feed_me_into_lbp }
+    fastlbp(all_feed_me_into_lbp)
 
-    // // ---------------------------------- //
-    // // process images using Otsu's method //
-    // // ---------------------------------- //
-    // imgs_and_masks_ch_split.otsu_mask
-    //     .map { imgg, mask_mode_auto, bg_shade ->
-    //     tuple(imgg, bg_shade) }
-    //     .set { imgs_to_get_masks }
-    // OtsuWorkflow(imgs_to_get_masks)
 }
 
 
@@ -715,13 +767,6 @@ workflow MultiImage {
 }
 
 workflow Pipeline {
-    // TODO: update to new config format (as used in grid_search.nf)
-    params_args_list = params.args.collect { k, v -> [k, v] }
-
-    lbp_params = params.args.lbp.collect { k, v -> [k, v] }
-    umap_params = params.args.dimred.collect { k, v -> [k, v] }
-    hdbscan_params = params.args.clustering.collect { k, v -> [k, v] }
-
     if ( params.img_path && !params.imgs_dir )
         SingleImage()
     else
