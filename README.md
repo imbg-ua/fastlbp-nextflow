@@ -4,28 +4,49 @@
 The pipeline supports the following modes:
 - **GridSearch** which allows you to specify lists of parameters for each step to run the pipeline using all possible combinations.
 - **SingleImage** to process a single image.
-- **MultiImage** to process a folder of images.
+- **MultiImage** to process a set of images.
 
 ## Requirements
 **(to be completed)**
 
 ## How to use
 
-Choose a `grid` mode template from the `templates/` folder and run:
+The `templates/` folder provides config file templates to run the workflow in different modes. Combined with the `--mode` flag, it automatically determines the execution mode based on the template structure.
+
+## Examples
+
+### Grid mode
 ```bash
 nextflow run main.nf -profile conda --mode grid -params-file templates/grid_search_template.yaml
 ```
 
-To run the workflow in `Single Image` or `Multi Image` mode, change the `--mode` flag and provide the appropriate template file:
+### Process a single image
+
+```bash
+nextflow run main.nf -profile conda --mode normal -params-file templates/single_image.yaml
+```
+
+### Process multiple images
+
 ```bash
 nextflow run main.nf -profile conda --mode normal -params-file templates/multiple_images.yaml
 ```
 
-The workflow will automatically determine the execution mode based on the template structure.
+### fastLBP Only
 
-### Run only fastLBP
+You can run only `fastLBP` instead of the full analysis pipeline in both Single and Multi Image modes:
 
-To process images with fastLBP only, check out the structure required for the `TSV` file with input parameters and run:
 ```bash
-nextflow run main.nf -profile conda --mode lbp_only --lbp_runs_tsv modules/feature_extraction/lbp_only_template.tsv
+nextflow run main.nf -profile conda --mode lbp_only -params-file templates/multiple_images.yaml
 ```
+
+```bash
+nextflow run main.nf -profile conda --mode lbp_only -params-file templates/single_image.yaml
+```
+
+Alternatively, if you want a more flexible option than using the same set of LBP parameters provided in a YAML file to process all images of interest, you can opt for the `lbp_tsv` mode, which accepts a `TSV` with each run's info on a new line.
+
+```bash
+nextflow run main.nf -profile conda --mode lbp_tsv --lbp_runs_tsv modules/feature_extraction/lbp_only_template.tsv --outdir /path/to/outdir
+```
+

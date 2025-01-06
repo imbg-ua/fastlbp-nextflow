@@ -2,18 +2,39 @@
 
 
 // fair execution is needed for the LBP-only mode
-fair = false
-if ( params.mode == 'lbp_only' ) {
-    fair = true
+params.fair = false
+if ( params.mode == 'lbp_tsv' ) {
+    params.fair = true
 }
+
+println "fair in normal main : ${params.fair} DEBUG"
 
 // TODO refactor and set default values for all required params
 // params.args.lbp.ncpus = 10
-params.args = [:]
-params.args.lbp = [:]
-params.args.lbp.outfile_name = 'lbp_module_result.npy'
-params.args.lbp.img_name = 'lbp_module_result_img_name'
-params.args.lbp.ncpus = 10
+
+// TODO: BUG: why these parameters have higher priority than those specified in the yaml file?
+// it contradicts the docs: https://www.nextflow.io/docs/latest/config.html#configuration-file
+if ( !params.args )
+    params.args = [:]
+if ( !params.args.lbp )
+    params.args.lbp = [:]
+if ( !params.args.dimred )
+    params.args.dimred = [:]
+if ( !params.args.clustering )
+    params.args.clustering = [:]
+
+
+// if ( !params.args.lbp_outfile_name )
+//     params.args.lbp.outfile_name = 'lbp_module_result.npy'
+// if ( !params.args.lbp.img_name )
+//     params.args.lbp.img_name = 'lbp_module_result_img_name'
+// if ( !params.args.lbp.ncpus )
+//     params.args.lbp.ncpus = 10
+
+params.ncpus = 10
+params.outfile_name = 'lbp_result.npy'
+params.img_name = 'lbp_result'
+
 // params.args.lbp.img_name = 'lbp_module_result'
 
 // TODO: update to new config format (as used in grid_search.nf)
@@ -23,10 +44,11 @@ lbp_params = params.args.lbp.collect { k, v -> [k, v] }
 umap_params = params.args.dimred.collect { k, v -> [k, v] }
 hdbscan_params = params.args.clustering.collect { k, v -> [k, v] }
 
+println "lbp params : ${lbp_params} DEBUG"
+
 include { infoLog; 
           checkNextflowVersion; 
-          getValueFromParamList;
-          get_param_value_from_param_str } from '../../lib/nf/utils'
+          getValueFromParamList } from '../../lib/nf/utils'
 
 nextflow.enable.dsl = 2
 pipeline_version = "0.0.2"
@@ -39,7 +61,7 @@ checkNextflowVersion()
 process convert_annotations_to_binmask {
     tag "mask preprocessing"
     debug params.debug_flag
-    fair fair
+    fair params.fair
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
@@ -63,7 +85,7 @@ process convert_annotations_to_binmask {
 process get_tissue_mask {
     tag "${img_id}"
     debug params.debug_flag
-    fair fair
+    fair params.fair
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
@@ -85,7 +107,7 @@ process get_tissue_mask {
 process downscale_mask {
     tag "${img_id}"
     debug params.debug_flag
-    fair fair
+    fair params.fair
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
@@ -107,7 +129,7 @@ process downscale_mask {
 
 process fastlbp {
     tag "${img_id}"
-    fair fair
+    fair params.fair
     debug params.debug_flag
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
@@ -116,8 +138,8 @@ process fastlbp {
 
     output:
     path("data")
-    tuple val(img_id), path("data/out/${file(params.args.lbp.outfile_name).getBaseName()}_flattened.npy"), emit: lbp_result_file_flattened
-    tuple val(img_id), path("data/out/${file(params.args.lbp.outfile_name).getBaseName()}.npy"), emit: lbp_result_file_img
+    tuple val(img_id), path("data/out/${file(params.outfile_name).getBaseName()}_flattened.npy"), emit: lbp_result_file_flattened
+    tuple val(img_id), path("data/out/${file(params.outfile_name).getBaseName()}.npy"), emit: lbp_result_file_img
 
     script:
     img_id = img.getBaseName()
@@ -127,18 +149,18 @@ process fastlbp {
     run_lbp.py main \
         --img_path ${img} \
         --params_str "${params_str}" \
-        --ncpus ${params.args.lbp.ncpus} \
-        --outfile_name ${params.args.lbp.outfile_name} \
+        --ncpus ${params.ncpus} \
+        --outfile_name ${params.outfile_name} \
         ${mask_path} \
         ${patchmask_path} \
-        --img_name ${params.args.lbp.img_name}
+        --img_name ${params.img_name}
     """
 }
 
 process dimred {
     tag "${img_id}"
     debug params.debug_flag
-    fair fair
+    fair params.fair
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
@@ -158,7 +180,7 @@ process dimred {
 process clustering {
     tag "${img_id}"
     debug params.debug_flag
-    fair fair
+    fair params.fair
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
@@ -178,7 +200,7 @@ process clustering {
 process labels_to_patch_img {
     tag "${img_id}"
     debug params.debug_flag
-    fair fair
+    fair params.fair
     publishDir "${params.outdir}/${img_id}", mode: "copy"
 
     input:
@@ -209,28 +231,30 @@ workflow SingleImage {
 
         fastlbp(lbp_input_ch)
 
-        fastlbp.out.lbp_result_file_flattened
-            .combine([[umap_params]])
-            .set { feed_me_into_umap }
+        if ( params.mode != 'lbp_only' ) {
+            fastlbp.out.lbp_result_file_flattened
+                .combine([[umap_params]])
+                .set { feed_me_into_umap }
 
-        fastlbp.out.lbp_result_file_img
-            .set { lbp_runs }
-        
-        dimred(feed_me_into_umap)
+            fastlbp.out.lbp_result_file_img
+                .set { lbp_runs }
+            
+            dimred(feed_me_into_umap)
 
-        dimred.out
-            .combine([[hdbscan_params]])
-            .set { feed_me_into_hdbscan }
-        
-        clustering(feed_me_into_hdbscan)
+            dimred.out
+                .combine([[hdbscan_params]])
+                .set { feed_me_into_hdbscan }
+            
+            clustering(feed_me_into_hdbscan)
 
-        clustering.out
-            .join(lbp_runs)
-            .map { img_id, clust_labels, lbp_result ->
-            tuple(img_id, clust_labels, [], lbp_result) }
-            .set { convert_my_labels_to_img }
+            clustering.out
+                .join(lbp_runs)
+                .map { img_id, clust_labels, lbp_result ->
+                tuple(img_id, clust_labels, [], lbp_result) }
+                .set { convert_my_labels_to_img }
 
-        labels_to_patch_img(convert_my_labels_to_img)
+            labels_to_patch_img(convert_my_labels_to_img)
+        }
 
     } else if ( params.mask == "auto" ) {
         
@@ -257,27 +281,29 @@ workflow SingleImage {
 
         fastlbp(feed_me_into_lbp)
 
-        fastlbp.out.lbp_result_file_flattened
-            .combine([[umap_params]])
-            .set { feed_me_into_umap }
+        if ( params.mode != 'lbp_only' ) {
+            fastlbp.out.lbp_result_file_flattened
+                .combine([[umap_params]])
+                .set { feed_me_into_umap }
 
-        fastlbp.out.lbp_result_file_img
-            .set { lbp_runs }
-        
-        dimred(feed_me_into_umap)
+            fastlbp.out.lbp_result_file_img
+                .set { lbp_runs }
+            
+            dimred(feed_me_into_umap)
 
-        dimred.out
-            .combine([[hdbscan_params]])
-            .set { feed_me_into_hdbscan }
-        
-        clustering(feed_me_into_hdbscan)
+            dimred.out
+                .combine([[hdbscan_params]])
+                .set { feed_me_into_hdbscan }
+            
+            clustering(feed_me_into_hdbscan)
 
-        clustering.out
-            .join(image_and_patchmask_ch)
-            .join(lbp_runs)
-            .set { convert_my_labels_to_img }
+            clustering.out
+                .join(image_and_patchmask_ch)
+                .join(lbp_runs)
+                .set { convert_my_labels_to_img }
 
-        labels_to_patch_img(convert_my_labels_to_img)
+            labels_to_patch_img(convert_my_labels_to_img)
+        }
     } else {
 
         // Mask mode
@@ -311,27 +337,29 @@ workflow SingleImage {
 
         fastlbp(feed_me_into_lbp)
 
-        fastlbp.out.lbp_result_file_flattened
-            .combine([[umap_params]])
-            .set { feed_me_into_umap }
+        if ( params.mode != 'lbp_only' ) {
+            fastlbp.out.lbp_result_file_flattened
+                .combine([[umap_params]])
+                .set { feed_me_into_umap }
 
-        fastlbp.out.lbp_result_file_img
-            .set { lbp_runs }
-        
-        dimred(feed_me_into_umap)
+            fastlbp.out.lbp_result_file_img
+                .set { lbp_runs }
+            
+            dimred(feed_me_into_umap)
 
-        dimred.out
-            .combine([[hdbscan_params]])
-            .set { feed_me_into_hdbscan }
-        
-        clustering(feed_me_into_hdbscan)
+            dimred.out
+                .combine([[hdbscan_params]])
+                .set { feed_me_into_hdbscan }
+            
+            clustering(feed_me_into_hdbscan)
 
-        clustering.out
-            .join(image_and_patchmask_ch)
-            .join(lbp_runs)
-            .set { convert_my_labels_to_img }
+            clustering.out
+                .join(image_and_patchmask_ch)
+                .join(lbp_runs)
+                .set { convert_my_labels_to_img }
 
-        labels_to_patch_img(convert_my_labels_to_img)
+            labels_to_patch_img(convert_my_labels_to_img)
+        }
     }
 }
 
@@ -361,27 +389,30 @@ workflow OtsuWorkflow {
 
     fastlbp(feed_me_into_lbp)
 
-    fastlbp.out.lbp_result_file_flattened
-        .combine([[umap_params]])
-        .set { feed_me_into_umap }
+    // TODO: improve control flow design
+    if ( params.mode != 'lbp_only' ) {
+        fastlbp.out.lbp_result_file_flattened
+            .combine([[umap_params]])
+            .set { feed_me_into_umap }
 
-    fastlbp.out.lbp_result_file_img
-        .set { lbp_runs }
-    
-    dimred(feed_me_into_umap)
+        fastlbp.out.lbp_result_file_img
+            .set { lbp_runs }
+        
+        dimred(feed_me_into_umap)
 
-    dimred.out
-        .combine([[hdbscan_params]])
-        .set { feed_me_into_hdbscan }
-    
-    clustering(feed_me_into_hdbscan)
+        dimred.out
+            .combine([[hdbscan_params]])
+            .set { feed_me_into_hdbscan }
+        
+        clustering(feed_me_into_hdbscan)
 
-    clustering.out
-        .join(image_and_patchmask_ch)
-        .join(lbp_runs)
-        .set { convert_my_labels_to_img }
+        clustering.out
+            .join(image_and_patchmask_ch)
+            .join(lbp_runs)
+            .set { convert_my_labels_to_img }
 
-    labels_to_patch_img(convert_my_labels_to_img)
+        labels_to_patch_img(convert_my_labels_to_img)
+    }
 }
 
 workflow NoMaskWorkFlow {
@@ -392,28 +423,31 @@ workflow NoMaskWorkFlow {
 
     fastlbp(imgs_and_lbp_params)
 
-    fastlbp.out.lbp_result_file_flattened
-        .combine([[umap_params]])
-        .set { feed_me_into_umap }
+    if ( params.mode != 'lbp_only' ) {
+        fastlbp.out.lbp_result_file_flattened
+            .combine([[umap_params]])
+            .set { feed_me_into_umap }
 
-    fastlbp.out.lbp_result_file_img
-        .set { lbp_runs }
+        fastlbp.out.lbp_result_file_img
+            .set { lbp_runs }
 
-    dimred(feed_me_into_umap)
+        dimred(feed_me_into_umap)
 
-    dimred.out
-        .combine([[hdbscan_params]])
-        .set { feed_me_into_hdbscan }
+        dimred.out
+            .combine([[hdbscan_params]])
+            .set { feed_me_into_hdbscan }
 
-    clustering(feed_me_into_hdbscan)
+        clustering(feed_me_into_hdbscan)
 
-    clustering.out
-        .join(lbp_runs)
-        .map { img_id, clust_labels, lbp_result ->
-        tuple(img_id, clust_labels, [], lbp_result) }
-        .set { convert_my_labels_to_img }
+        clustering.out
+            .join(lbp_runs)
+            .map { img_id, clust_labels, lbp_result ->
+            tuple(img_id, clust_labels, [], lbp_result) }
+            .set { convert_my_labels_to_img }
 
-    labels_to_patch_img(convert_my_labels_to_img)
+        labels_to_patch_img(convert_my_labels_to_img)
+    }
+
 }
 
 workflow ProvidedMaskWorkflow {
@@ -435,143 +469,32 @@ workflow ProvidedMaskWorkflow {
 
     fastlbp(feed_me_into_lbp)
 
-    fastlbp.out.lbp_result_file_flattened
-        .combine([[umap_params]])
-        .set { feed_me_into_umap }
+    // TODO: improve control flow design
+    if ( params.mode != 'lbp_only' ) {
+        fastlbp.out.lbp_result_file_flattened
+            .combine([[umap_params]])
+            .set { feed_me_into_umap }
 
-    fastlbp.out.lbp_result_file_img
-        .set { lbp_runs }
+        fastlbp.out.lbp_result_file_img
+            .set { lbp_runs }
 
-    dimred(feed_me_into_umap)
+        dimred(feed_me_into_umap)
 
-    dimred.out
-        .combine([[hdbscan_params]])
-        .set { feed_me_into_hdbscan }
+        dimred.out
+            .combine([[hdbscan_params]])
+            .set { feed_me_into_hdbscan }
 
-    clustering(feed_me_into_hdbscan)
+        clustering(feed_me_into_hdbscan)
 
-    clustering.out
-        .join(image_and_patchmask_ch)
-        .join(lbp_runs)
-        .set { convert_my_labels_to_img }
+        clustering.out
+            .join(image_and_patchmask_ch)
+            .join(lbp_runs)
+            .set { convert_my_labels_to_img }
 
-    labels_to_patch_img(convert_my_labels_to_img)
-
-}
-
-// TODO: this doesn't allow processing same images with different lbp parameters
-// well, it allows, but the outdirs are the same and outputs for different runs interfere 
-// and get overwritten by each other. To fix this, need to create run hashes and save outputs 
-// similarly to the grid search mode
-workflow MultiImageLBP {
-
-    def lbp_runs_tsv = Channel.fromPath(params.lbp_runs_tsv)
-    lbp_runs_tsv
-        .splitCsv(header:true, sep:'\t')
-        .map { row -> tuple( row.image, row.mask, row.background_color, row.lbp_params_str)
-        }
-        .set{ lbp_runs_params }
-
-    lbp_runs_params
-        .branch { 
-            without_mask: (it[1] == "" || it[1] == "no")
-                return tuple(it[0], it[3]) // (image, lbp_params_str)
-            otsu_mask: it[1] == "auto"
-                return it // the whole tuple
-            with_mask: (it[1] != "" && it[1] != "no")
-                return it // the whole tuple
-        }
-        .set { lbp_runs_params_split_by_mask }
-
-
-    // ------------------------- //
-    // process images with masks //
-    // ------------------------- //
-    lbp_runs_params_split_by_mask.with_mask
-        .multiMap { image, mask, background_color, lbp_params_str ->
-            convert_to_binmask_ch: tuple(image, mask, background_color)
-            lbp_params_ch: lbp_params_str
-        }
-        .set { convert_me_to_binmask }
-    
-    convert_annotations_to_binmask(convert_me_to_binmask.convert_to_binmask_ch)
-    
-    // patchsize parameter value from parameter string extraction pattern
-    def patchsize_pattern = /patchsize, (\d+)/
-
-    convert_annotations_to_binmask.out
-        .merge(convert_me_to_binmask.lbp_params_ch)
-        .map { imgg, binmaskk, lbp_params_strr ->
-        tuple(imgg, binmaskk, get_param_value_from_param_str(lbp_params_strr, patchsize_pattern)) }
-        .set { downscale_me_with_mask }
-    
-    // downscale_mask(downscale_me_with_mask)
-
-    // downscale_mask.out
-    //     .merge(convert_me_to_binmask.lbp_params_ch)
-    //     .set { feed_me_into_lbp }
-
-    // fastlbp(feed_me_into_lbp)
-
-    // ---------------------------- //
-    // process images without masks //
-    // ---------------------------- //
-    lbp_runs_params_split_by_mask.without_mask
-        .map { image, lbp_params_str ->
-        tuple(image, [], [], lbp_params_str) }
-        .set { feed_me_into_lbp_no_mask }
-
-    // fastlbp(feed_me_into_lbp_no_mask)
-
-    // ---------------------------------- //
-    // process images using Otsu's method //
-    // ---------------------------------- //
-
-    lbp_runs_params_split_by_mask.otsu_mask
-        .multiMap { image, mask, background_color, lbp_params_str ->
-            get_otsu_mask_ch: tuple(image, background_color)
-            lbp_params_otsu_ch: lbp_params_str
-        }
-        .set { img_to_get_masks }
-
-    get_tissue_mask(img_to_get_masks.get_otsu_mask_ch)
-
-    get_tissue_mask.out
-        .merge(img_to_get_masks.lbp_params_otsu_ch)
-        .map { imgg, binmaskk, lbp_params_strr ->
-        tuple(imgg, binmaskk, get_param_value_from_param_str(lbp_params_strr, patchsize_pattern)) }
-        .set { downscale_me_otsu }
-    
-    // downscale_mask(downscale_me_otsu)
-
-    // downscale_mask.out
-    //     .merge(img_to_get_masks.lbp_params_otsu_ch)
-    //     .set { feed_me_into_lbp_otsu }
-
-
-    // downscale provided masks and otsu masks and create a combined channel with fastlbp inputs
-
-    downscale_me_otsu.concat(downscale_me_with_mask)
-        .set { downscale_me_otsu_and_with_mask }
-
-    img_to_get_masks.lbp_params_otsu_ch.concat(convert_me_to_binmask.lbp_params_ch)
-        .set { lbp_params_str_otsu_and_with_mask }
-
-    downscale_mask(downscale_me_otsu_and_with_mask)
-    downscale_mask.out
-        .merge(lbp_params_str_otsu_and_with_mask)
-        .set { feed_me_into_lbp_otsu_and_with_mask } 
-
-
-    // fastlbp
-    feed_me_into_lbp_no_mask.concat(feed_me_into_lbp_otsu_and_with_mask)
-        .set { all_feed_me_into_lbp }
-    fastlbp(all_feed_me_into_lbp)
+        labels_to_patch_img(convert_my_labels_to_img)
+    }
 
 }
-
-
-
 
 // TODO: organize repetitive code into workflows
 workflow MultiImage {

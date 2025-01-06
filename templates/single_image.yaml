@@ -13,6 +13,15 @@ background_color: [255, 255, 255] # default is 0
 # background_color: light/dark
 
 # --- specify parameters to test --- #
+
+# TODO: improve parameter parsing
+
+# these LBP parameters must be specified outside the args block
+# Please only set them here or as the command line arguments
+ncpus: 30
+outfile_name: 'lbp_result.npy'
+img_name: 'lbp_result'
+
 args:
   lbp:
     patchsize: 242
@@ -20,9 +29,6 @@ args:
     radii: [1, 2, 3, 4, 5]
     # don't specify to automatically calculate number of points for each radius
     npoints: [7, 13, 19, 26, 32]
-    ncpus: 30
-    outfile_name: 'lbp_result.npy'
-    img_name: 'lbp_result'
   dimred:
     method: pca
     n_components: 20

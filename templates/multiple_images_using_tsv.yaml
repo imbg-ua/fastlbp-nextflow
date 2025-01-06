@@ -9,14 +9,20 @@ imgs_and_masks_tsv: '/path/to/templates/multi_image.tsv'
 outdir: '/path/to/outdir'
 
 # --- specify parameters --- #
+
+# TODO: improve parameter parsing
+
+# these LBP parameters must be specified outside the args block
+# Please only set them here or as the command line arguments
+ncpus: 30
+outfile_name: 'lbp_result.npy'
+img_name: 'lbp_result'
+
 args:
   lbp:
     patchsize: 10
     radii: [1, 5] # don't specify to automatically calculate radii according to the default scheme
     npoints: [6, 12] # don't specify to automatically calculate number of points for each radius
-    ncpus: 30
-    outfile_name: 'lbp_result.npy'
-    img_name: 'lbp_result'
   dimred:
     method: umap # [umap, pca, tsne]
     n_components: 20

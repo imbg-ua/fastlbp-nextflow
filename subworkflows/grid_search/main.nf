@@ -351,6 +351,8 @@ workflow Pipeline {
         log.error("""
         Parameter search is available only in SingleImage mode.
         Make sure you provided correct path to the image.
+        Processing multiple images with multiple sets of parameters
+        will be soon available through TSV file-based interface.
         """)
     }
 }
