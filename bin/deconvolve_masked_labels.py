@@ -34,7 +34,6 @@ def labels_to_patch_img(
 
     np.save(savefile, labels_img)    
 
-# TODO: check all cases, seems like this will go out of bounds if remainders are 0
 def patch_to_pixel_img(
     np_patch_img_path: str,
     patchsize: int,

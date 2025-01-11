@@ -4,8 +4,6 @@
 params.fair = true
 params.lbp_runs_tsv = ''
 
-println "fair in other main : ${params.fair} DEBUG "
-
 include { checkNextflowVersion;
           get_param_value_from_param_str } from '../../lib/nf/utils'
 

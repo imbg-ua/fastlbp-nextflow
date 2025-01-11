@@ -68,7 +68,6 @@ def process_outdir(outdir: str, metadata_tsv: str='hash_to_combination.tsv', plo
 
     return runs_info
 
-# TODO: add backend selection option: matplotlib, plotly, etc.
 def render_template(img_path: str, runs_info: pd.DataFrame,
                     annot_path: str='', integer_annot_path: str='', 
                     annot_legend_path: str='', 

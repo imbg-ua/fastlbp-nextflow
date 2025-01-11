@@ -20,20 +20,8 @@ nextflow.enable.dsl = 2
 
 pipeline_version = "0.0.2"
 
-// // Default params
-// // TODO: move to config
-// // TODO: move before imports
-// params.background_color = ""
-// params.pairs_max_csv = 'pairs_max_jacc.csv'
-// // params.pairs_max_csv = '' // TODO: BUG: Make dependent oт the availability of annotaitons
-// params.annot_legend_path = ""
-// params.plots_backend = 'matplotlib'
-
-// debug_flag = true
-
 // params.constargs = ''
 
-println "fair in main : ${params.fair} DEBUG "
 checkNextflowVersion()
 
 // entry point for the whole tool

@@ -7,7 +7,6 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 import workflow_utils as ut
 
-# TODO: export as R arrays
 def run_umap(
     np_data_path: str, 
     n_components=2, 

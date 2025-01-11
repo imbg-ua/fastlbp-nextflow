@@ -7,8 +7,6 @@ if ( params.mode == 'lbp_tsv' ) {
     params.fair = true
 }
 
-println "fair in normal main : ${params.fair} DEBUG"
-
 // TODO refactor and set default values for all required params
 // params.args.lbp.ncpus = 10
 
@@ -43,8 +41,6 @@ params_args_list = params.args.collect { k, v -> [k, v] }
 lbp_params = params.args.lbp.collect { k, v -> [k, v] }
 umap_params = params.args.dimred.collect { k, v -> [k, v] }
 hdbscan_params = params.args.clustering.collect { k, v -> [k, v] }
-
-println "lbp params : ${lbp_params} DEBUG"
 
 include { infoLog; 
           checkNextflowVersion; 

@@ -47,10 +47,8 @@ def getFinalOutdirFromParamsCombinations(param_combinations_and_outputs) {
     return param_combinations_and_outputs[-2]
 }
 
-// TODO: switch to camel case to enhance consistency with Groovy conventions
 def getAllOutputFilesFromParamsCombinations(param_combinations_and_outputs) {
     def even_elements = param_combinations_and_outputs.findAll { param_combinations_and_outputs.indexOf(it) % 2 != 0 }
-    // println "$even_elements qweqweqwesss"
     return even_elements as Tuple
 }
 
