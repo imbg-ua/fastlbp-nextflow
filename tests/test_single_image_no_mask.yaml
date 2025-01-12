@@ -1,0 +1,2 @@
+- name: SingleImage No mask mode
+  command: nextflow run ../main.nf -params-file  -profile conda 
