@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 
-from PIL import Image
 import os
-import fire
-import tifffile as tf
-import numpy as np
-import ast
 import re
+import ast
+
+import fire
+import numpy as np
+import tifffile as tf
+from PIL import Image
+
 
 Image.MAX_IMAGE_PIXELS = None
 
@@ -74,6 +76,7 @@ def parse_params_str(params_str: str) -> dict:
 
 import pandas as pd
 from sklearn.metrics import jaccard_score
+
 
 def load_and_resize(gt_path: str, patch_labels_path: str) -> tuple[np.array, np.array]:
     gt = read_img(gt_path)

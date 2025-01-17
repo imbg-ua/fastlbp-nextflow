@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 
-import pandas as pd
 import os
-import workflow_utils as ut
-import plotting_utils as pt
+
 import fire
+import pandas as pd
 from jinja2 import Environment, FileSystemLoader
+
+import plotting_utils as pt
+import workflow_utils as ut
 
 
 def params_str_to_list_of_dicts(params_str: str) -> str:

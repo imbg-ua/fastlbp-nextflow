@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
-import workflow_utils as ut
 import fire
+
+import workflow_utils as ut
+
 
 def calculate_jaccard_score_for_run(patch_img_path: str, 
                                     annotation_path: str, 

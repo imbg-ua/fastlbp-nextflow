@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 
+import fire
+import numpy as np
+import scanpy as sc
+import anndata as adata
 import hdbscan
 from sklearn.cluster import KMeans, AffinityPropagation
 from sklearn.mixture import GaussianMixture
-import anndata as adata
-import scanpy as sc
-import fire
-import numpy as np
+
 import workflow_utils as ut
 
 

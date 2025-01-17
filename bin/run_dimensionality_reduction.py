@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 
-import umap
 import fire
+import umap
 import numpy as np
-from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA
+
 import workflow_utils as ut
+
 
 def run_umap(
     np_data_path: str, 

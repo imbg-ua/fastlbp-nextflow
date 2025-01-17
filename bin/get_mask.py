@@ -3,10 +3,12 @@
 import fire
 import numpy as np
 import tifffile as tf
+from PIL import Image
 from scipy import ndimage
 from skimage import filters
+
 import workflow_utils as ut
-from PIL import Image
+
 
 Image.MAX_IMAGE_PIXELS = None
 

@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 
-import fastlbp_imbg as fastlbp
-import numpy as np
+import os
+
 import fire
+import numpy as np
+import fastlbp_imbg as fastlbp
+
 import workflow_utils as ut
 
-import os
 
 def get_radii_list(patchsize: int, a: float=1.499, b: float=1.327) -> list:
     """

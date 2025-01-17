@@ -1,25 +1,26 @@
 #!/usr/bin/env python3
 
-import numpy as np
-import pandas as pd
-import plotly.express as px
-from plotly.subplots import make_subplots
-import plotly.graph_objects as go
-from PIL import Image
 import os
-import workflow_utils as ut
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-import matplotlib.patches as mpatches
-from matplotlib import cm
-from matplotlib.colors import ListedColormap, LinearSegmentedColormap
-import matplotlib.colors as mcolors
-from copy import deepcopy
 import base64
 from io import BytesIO
-
+from copy import deepcopy
 from typing import List
+
+import numpy as np
+import pandas as pd
+import matplotlib as mpl
+import plotly.express as px
+import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+import plotly.graph_objects as go
+from PIL import Image
+from matplotlib import cm
+from plotly.subplots import make_subplots
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+import workflow_utils as ut
 
 
 PLOTTING_BACKENDS = ('matplotlib', 'plotly')
