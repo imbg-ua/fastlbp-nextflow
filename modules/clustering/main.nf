@@ -6,6 +6,11 @@
 // params.args.clustering.method = 'k_means' // default clustering method
 // params.debug_flag = true
 
+// it is only used in the tag in the clustering process, so maybe the default value is not needed at all here
+params.args = [:]
+params.args.clustering = [:]
+params.args.clustering.method = 'k_means'
+
 // uses image basename as run id
 process clustering_publish {
     tag "${img_id}"
@@ -56,8 +61,32 @@ workflow RunClustering {
     all_clustering_outputs = clustering.out
 }
 
+// TODO: merge with the workflow above to have a single entry point?
+workflow RunClusteringPublish {
+    take:
+    clustering_publish_inputs_channel
+
+    main:
+    clustering_publish(clustering_publish_inputs_channel)
+
+    emit:
+    all_clustering_outputs = clustering_publish.out
+}
+
 
 workflow {
-    // TODO: read needed parameters from tsv to run as a separate module
-    RunClustering()
+    // TODO: move binary scripts the corresponding module bin folders
+
+    // TODO: describe required input tsv structure in the module README
+    def inputs_tsv_ch = Channel.fromPath(params.inputs_tsv)
+
+    // required tsv file structure: run_id, input_np_array, params_str
+    inputs_tsv_ch
+        .splitCsv(header:true, sep:'\t')
+        .map { row -> 
+        tuple( row.run_id, row.input_np_array, row.params_str )
+        }
+        .set{ module_inputs_ch }
+
+    RunClusteringPublish(module_inputs_ch)
 }
