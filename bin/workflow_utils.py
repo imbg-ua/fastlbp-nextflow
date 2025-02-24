@@ -27,14 +27,18 @@ def read_img(path: str) -> np.array:
     if path_lower.endswith(PIL_EXTENSIONS):
         return np.asarray(Image.open(path))
 
-    elif path_lower.endswith(TIFFFILE_EXTENSIONS):
+    if path_lower.endswith(TIFFFILE_EXTENSIONS):
         return tf.imread(path) # returns numpy array
 
-    elif path_lower.endswith(NUMPY_EXTENSIONS):
+    if path_lower.endswith(NUMPY_EXTENSIONS):
         return np.load(path)
 
-    else:
-        raise ValueError(f'Image format {os.path.splitext(path)[1]} is not supported')
+    # use PIL as a fallback to read an unknown image format 
+    ext = os.path.splitext(path)[1]
+    try:
+        return np.asarray(Image.open(path))
+    except Exception as e:
+        raise ValueError(f'Image format {ext} is not supported: {repr(e)}')
 
 def convert_to_proper_type(val: str):
     try:
@@ -56,6 +60,10 @@ def parse_params_str(params_str: str) -> dict:
     params_str = re.sub(words_without_quotes, r"'\g<0>'", params_str) # single quote every string
 
     bool_regex = r"'\b(true|false)\b'"
+
+    # replace 'null' stemming from empty parameters in config with None
+    config_null = r"'\b(null)\b'"
+    params_str = re.sub(config_null, 'None', params_str)
 
     def bool_to_capital(match):
         word = match.group(1)
