@@ -563,28 +563,31 @@ workflow MultiImage {
             
             fastlbp(lbp_input_ch)
 
-            fastlbp.out.lbp_result_file_flattened
-                .combine([[umap_params]])
-                .set { feed_me_into_umap }
+            if ( params.mode != 'lbp_only' ) {
 
-            fastlbp.out.lbp_result_file_img
-                .set { lbp_runs }
-            
-            dimred(feed_me_into_umap)
+                fastlbp.out.lbp_result_file_flattened
+                    .combine([[umap_params]])
+                    .set { feed_me_into_umap }
 
-            dimred.out
-                .combine([[hdbscan_params]])
-                .set { feed_me_into_hdbscan }
-            
-            clustering(feed_me_into_hdbscan)
+                fastlbp.out.lbp_result_file_img
+                    .set { lbp_runs }
+                
+                dimred(feed_me_into_umap)
 
-            clustering.out
-                .join(lbp_runs)
-                .map { img_id, clust_labels, lbp_result ->
-                tuple(img_id, clust_labels, [], lbp_result) }
-                .set { convert_my_labels_to_img }
+                dimred.out
+                    .combine([[hdbscan_params]])
+                    .set { feed_me_into_hdbscan }
+                
+                clustering(feed_me_into_hdbscan)
 
-            labels_to_patch_img(convert_my_labels_to_img)
+                clustering.out
+                    .join(lbp_runs)
+                    .map { img_id, clust_labels, lbp_result ->
+                    tuple(img_id, clust_labels, [], lbp_result) }
+                    .set { convert_my_labels_to_img }
+
+                labels_to_patch_img(convert_my_labels_to_img)
+            }
         } else if ( params.masks == "auto" ) {
             infoLog("Otsu mask mode")
             
@@ -612,27 +615,30 @@ workflow MultiImage {
 
             fastlbp(feed_me_into_lbp)
 
-            fastlbp.out.lbp_result_file_flattened
-                .combine([[umap_params]])
-                .set { feed_me_into_umap }
+            if ( params.mode != 'lbp_only' ) {
 
-            fastlbp.out.lbp_result_file_img
-                .set { lbp_runs }
-            
-            dimred(feed_me_into_umap)
+                fastlbp.out.lbp_result_file_flattened
+                    .combine([[umap_params]])
+                    .set { feed_me_into_umap }
 
-            dimred.out
-                .combine([[hdbscan_params]])
-                .set { feed_me_into_hdbscan }
-            
-            clustering(feed_me_into_hdbscan)
+                fastlbp.out.lbp_result_file_img
+                    .set { lbp_runs }
+                
+                dimred(feed_me_into_umap)
 
-            clustering.out
-                .join(image_and_patchmask_ch)
-                .join(lbp_runs)
-                .set { convert_my_labels_to_img }
+                dimred.out
+                    .combine([[hdbscan_params]])
+                    .set { feed_me_into_hdbscan }
+                
+                clustering(feed_me_into_hdbscan)
 
-            labels_to_patch_img(convert_my_labels_to_img)
+                clustering.out
+                    .join(image_and_patchmask_ch)
+                    .join(lbp_runs)
+                    .set { convert_my_labels_to_img }
+
+                labels_to_patch_img(convert_my_labels_to_img)
+            }
         } else {
             infoLog("Masks directory mode")
 
@@ -659,29 +665,31 @@ workflow MultiImage {
 
             fastlbp(feed_me_into_lbp)
 
-            fastlbp.out.lbp_result_file_flattened
-                .combine([[umap_params]])
-                .set { feed_me_into_umap }
+            if ( params.mode != 'lbp_only' ) {
 
-            fastlbp.out.lbp_result_file_img
-                .set { lbp_runs }
-            
-            dimred(feed_me_into_umap)
+                fastlbp.out.lbp_result_file_flattened
+                    .combine([[umap_params]])
+                    .set { feed_me_into_umap }
 
-            dimred.out
-                .combine([[hdbscan_params]])
-                .set { feed_me_into_hdbscan }
-            
-            clustering(feed_me_into_hdbscan)
+                fastlbp.out.lbp_result_file_img
+                    .set { lbp_runs }
+                
+                dimred(feed_me_into_umap)
 
-            clustering.out
-                .join(image_and_patchmask_ch)
-                .join(lbp_runs)
-                .set { convert_my_labels_to_img }
+                dimred.out
+                    .combine([[hdbscan_params]])
+                    .set { feed_me_into_hdbscan }
+                
+                clustering(feed_me_into_hdbscan)
 
-            labels_to_patch_img(convert_my_labels_to_img)
+                clustering.out
+                    .join(image_and_patchmask_ch)
+                    .join(lbp_runs)
+                    .set { convert_my_labels_to_img }
+
+                labels_to_patch_img(convert_my_labels_to_img)
+            }
         }
-
     }    
 }
 
