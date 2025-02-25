@@ -3,7 +3,7 @@
 // TODO: nested arguments are not correctly overriden by the parameters file?
 // params.args.clustering.method = 'k_means' // default clustering method
 params.debug_flag = true
-params.mode = 'grid' // [normal, lbp_only, lbp_tsv]
+params.mode = 'normal' // [normal, lbp_only, lbp_tsv, grid]
 params.fair = false
 if ( params.mode == 'lbp_tsv' ) {
     params.fair = true // for lbp_tsv fair directive is needed. TODO: optimise this

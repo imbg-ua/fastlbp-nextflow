@@ -127,16 +127,15 @@ process fastlbp {
     tag "${img_id}"
     fair params.fair
     debug params.debug_flag
-    publishDir "${params.outdir}/${img_id}", mode: "copy"
+    publishDir "${publish_dir}", mode: "copy"
 
     input:
     tuple path(img), path(mask), path(patchmask), val(params_str)
 
     output:
-    // path("data")
-    path("data/tmp"), optional: true
-    tuple val(img_id), path("data/out/${file(params.outfile_name).getBaseName()}_flattened.npy"), emit: lbp_result_file_flattened, optional: true
-    tuple val(img_id), path("data/out/${file(params.outfile_name).getBaseName()}.npy"), emit: lbp_result_file_img
+    path("data/tmp/*"), optional: true
+    tuple val(img_id), path("data/out/${file(outfile_name_id).getBaseName()}_flattened.npy"), emit: lbp_result_file_flattened, optional: true
+    tuple val(img_id), path("data/out/${file(outfile_name_id).getBaseName()}.npy"), emit: lbp_result_file_img
 
     script:
     img_id = img.getBaseName()
@@ -144,15 +143,25 @@ process fastlbp {
     patchmask_path = patchmask ? "--patch_mask ${patchmask}" : ""
     flatten_result = params.mode == 'lbp_only' ? 'False' : 'True'
     save_intermediate_results = params.cache_lbp_results ? 'True' : 'False'
+
+    // with id in the outdir name
+    publish_dir = params.mode == 'lbp_only' ? "${params.outdir}" : "${params.outdir}/${img_id}"
+
+    // with id in the filename or not
+    outfile_name_id = params.mode == 'lbp_only' ? "${img_id}_${params.outfile_name}" : "${params.outfile_name}"
+
+    // with id in the filename or noe
+    img_name_id = params.mode == 'lbp_only' ? "${img_id}_${params.img_name}" : "${params.img_name}"
+
     """
     run_lbp.py main \
         --img_path ${img} \
         --params_str "${params_str}" \
         --ncpus ${params.ncpus} \
-        --outfile_name ${params.outfile_name} \
+        --outfile_name ${outfile_name_id} \
         ${mask_path} \
         ${patchmask_path} \
-        --img_name ${params.img_name} \
+        --img_name ${img_name_id} \
         --save_intermediate_results ${save_intermediate_results} \
         --flatten_result ${flatten_result}
     """
