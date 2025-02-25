@@ -34,7 +34,8 @@ def run_lbp(
     patch_mask: str = None, 
     outfile_name: str = 'lbp_result.npy', 
     img_name: str = 'lbp_result', 
-    save_intermediate_results: bool = True) -> None:
+    save_intermediate_results: bool = False, 
+    flatten_result: bool = True) -> None:
 
     if radii is None:
         radii = get_radii_list(patchsize)
@@ -55,8 +56,6 @@ def run_lbp(
         lbp_result = np.load(f'data/out/{outfile_name}')
         lbp_result_flattened = lbp_result[patch_mask]
         
-        np.save(f'data/out/{os.path.splitext(outfile_name)[0]}_flattened.npy', lbp_result_flattened)
-
     else:
         fastlbp.run_fastlbp(img, radii, npoints, patchsize, ncpus,
         outfile_name=outfile_name, img_name=img_name, save_intermediate_results=save_intermediate_results)
@@ -64,6 +63,8 @@ def run_lbp(
         # TODO: refactor this
         lbp_result = np.load(f'data/out/{outfile_name}')
         lbp_result_flattened = lbp_result.reshape((-1, lbp_result.shape[-1])) # reshape to 2d <pixel, lbp codes>
+
+    if flatten_result:
         np.save(f'data/out/{os.path.splitext(outfile_name)[0]}_flattened.npy', lbp_result_flattened)
 
 
@@ -76,7 +77,8 @@ def main_grid_search(
     patch_mask: str = None, 
     outfile_name: str = 'lbp_result.py', 
     img_name: str = 'lbp_result', 
-    save_intermediate_results: bool = True) -> None:
+    save_intermediate_results: bool = False, 
+    flatten_result: bool = True) -> None:
 
     params_dict = ut.parse_params_str(params_str)
     run_lbp(img_path=img_path, 
@@ -86,6 +88,7 @@ def main_grid_search(
             outfile_name=outfile_name, 
             img_name=img_name, 
             save_intermediate_results=save_intermediate_results, 
+            flatten_result=flatten_result,
             **params_dict)
 
 def main(
@@ -96,7 +99,8 @@ def main(
     patch_mask: str = None,
     outfile_name: str = 'lbp_result.py', 
     img_name: str = 'lbp_result',
-    save_intermediate_results: bool = True) -> None:
+    save_intermediate_results: bool = False, 
+    flatten_result: bool = True) -> None:
 
     params_dict = ut.parse_params_str(params_str)
     run_lbp(img_path=img_path,
@@ -106,6 +110,7 @@ def main(
             outfile_name=outfile_name, 
             img_name=img_name,
             save_intermediate_results=save_intermediate_results,
+            flatten_result=flatten_result,
             **params_dict)
 
 if __name__ == '__main__':

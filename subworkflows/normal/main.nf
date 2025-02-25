@@ -133,14 +133,17 @@ process fastlbp {
     tuple path(img), path(mask), path(patchmask), val(params_str)
 
     output:
-    path("data")
-    tuple val(img_id), path("data/out/${file(params.outfile_name).getBaseName()}_flattened.npy"), emit: lbp_result_file_flattened
+    // path("data")
+    path("data/tmp"), optional: true
+    tuple val(img_id), path("data/out/${file(params.outfile_name).getBaseName()}_flattened.npy"), emit: lbp_result_file_flattened, optional: true
     tuple val(img_id), path("data/out/${file(params.outfile_name).getBaseName()}.npy"), emit: lbp_result_file_img
 
     script:
     img_id = img.getBaseName()
     mask_path = mask ? "--img_mask ${mask}" : ""
     patchmask_path = patchmask ? "--patch_mask ${patchmask}" : ""
+    flatten_result = params.mode == 'lbp_only' ? 'False' : 'True'
+    save_intermediate_results = params.cache_lbp_results ? 'True' : 'False'
     """
     run_lbp.py main \
         --img_path ${img} \
@@ -149,7 +152,9 @@ process fastlbp {
         --outfile_name ${params.outfile_name} \
         ${mask_path} \
         ${patchmask_path} \
-        --img_name ${params.img_name}
+        --img_name ${params.img_name} \
+        --save_intermediate_results ${save_intermediate_results} \
+        --flatten_result ${flatten_result}
     """
 }
 
