@@ -50,3 +50,9 @@ Alternatively, if you want a more flexible option than using the same set of LBP
 nextflow run main.nf -profile conda --mode lbp_tsv --lbp_runs_tsv modules/feature_extraction/lbp_only_template.tsv --outdir /path/to/outdir
 ```
 
+
+### LSF
+Use LSF configuration file to run pipeline on an LSF cluster.
+```bash
+nextflow run main.nf -profile conda -params-file templates/multiple_images.yaml -c lsf_config.config --mode lbp_only
+```
