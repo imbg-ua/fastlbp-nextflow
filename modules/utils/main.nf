@@ -1,7 +1,10 @@
 #!/usr/bin/env/ nextflow
 
 
-include { createCombinations } from '../../lib/nf/utils'
+include { createCombinations; 
+          checkNestedParameterCombinations; 
+          getFinalOutdirFromParamsCombinations; 
+          getAllOutputFilesFromParamsCombinations } from '../../lib/nf/utils'
 
 
 // generic utils module

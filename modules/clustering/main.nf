@@ -7,9 +7,16 @@
 // params.debug_flag = true
 
 // it is only used in the tag in the clustering process, so maybe the default value is not needed at all here
-params.args = [:]
-params.args.clustering = [:]
-params.args.clustering.method = 'k_means'
+// params.args = [:]
+// params.args.clustering = [:]
+// params.args.clustering.method = 'k_means'
+
+if ( !params.args )
+    params.args = [:]
+if ( !params.args.clustering )
+    params.args.clustering = [:]
+if ( !params.args.clustering.method )
+    params.args.clustering.method = 'k_means'
 
 // uses image basename as run id
 process clustering_publish {
