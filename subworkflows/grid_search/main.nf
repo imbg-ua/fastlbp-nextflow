@@ -39,7 +39,8 @@ include { LabelsToPatchImage;
           copy_files_to_target_dir;
           combinations_metadata_to_tsv;
           GetParameterCombinations;
-          ParameterCombinationsToMap } from '../../modules/utils'
+          ParameterCombinationsToMap; 
+          AllCombinationsToHashes } from '../../modules/utils'
 
 workflow NoMaskWorkflow {
 
