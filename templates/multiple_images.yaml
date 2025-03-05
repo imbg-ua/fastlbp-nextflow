@@ -1,10 +1,14 @@
 # --- set img path and savedir --- #
 imgs_dir: '/path/to/images/dir'
+# img_extensions: [] # optional. For example, ['tiff', 'jpg']. By default all images in the directory are processed
 outdir: '/path/to/outdir'
 
 # --- choose from the following or leave blank to not use the mask --- #
 # masks: '/path/to/mask/or/any/other/annotations'
 # masks: auto
+# annot_suffix: '_annotation'
+# annot_extension: 'npy'
+
 
 
 # --- specify parameters --- #

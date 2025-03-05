@@ -51,7 +51,9 @@ pipeline_version = "0.0.2"
 
 checkNextflowVersion()
 
-// params.annot_suffix = "annotation"
+params.annot_suffix = "_annotation"
+params.annot_extension = ""
+params.img_extensions = []
 
 
 process convert_annotations_to_binmask {
@@ -564,8 +566,12 @@ workflow MultiImage {
         OtsuWorkflow(imgs_to_get_masks)
            
     } else {
-
-        imgs = files("${params.imgs_dir}/*")
+        
+        // DEBUG test is works
+        imgs = params.img_extensions
+            ? files("${params.imgs_dir}/*.{${params.img_extensions.join(',')}}")
+            : files("${params.imgs_dir}/*")
+        
 
         if ( !params.masks ) {
             infoLog("No mask mode")
@@ -658,8 +664,11 @@ workflow MultiImage {
 
             imgs_and_masks = Channel.fromList(imgs)
                 .map {it -> 
-                    tuple(it, file(params.masks) \
-                    / it.getBaseName() + "_${params.annot_suffix}." + it.getExtension())
+                    // use image extension if not provided
+                    def maskExt = params.annot_extension ? params.annot_extension : it.extension
+                    def maskFile = file(params.masks) / it.getBaseName() + "${params.annot_suffix}." + maskExt
+
+                    tuple(it, maskFile)
                 }
                 .combine([[lbp_params]])
                 .map { img, pixelmask, lbp_params_list_cur ->
