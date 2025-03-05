@@ -53,16 +53,32 @@ def run_lbp(
         outfile_name=outfile_name, img_name=img_name, save_intermediate_results=save_intermediate_results,
         img_mask=img_mask.astype(np.uint8))
 
-        lbp_result = np.load(f'data/out/{outfile_name}')
-        lbp_result_flattened = lbp_result[patch_mask]
+        # BUG: if `mask_method == any`, then there could be patches that contain 1 non-zero pixel
+        # but for which LBP is calculated. In a supervised dataset preparation scenario such patches
+        # will be marked as `0` (background) but still have full-fledged LBP feature vectors instead of 
+        # all-zeroes
+        # to address this we need to additionally apply patch masking to the final LBP result to leave out
+        # patches with 0% < `non_background_pixel_fraction` < 50%  
+
+        # # yeah this sounds cool but the way image mask is resize to patch mask
+        # # does not necessarily work as "patches with 0% < `non_background_pixel_fraction` < 50% become 0"
+        # lbp_result = np.load(f'data/out/{outfile_name}')
+        # lbp_result[~patch_mask] = 0
+        # np.save(f'data/out/{outfile_name}', lbp_result)
+
+
+        if flatten_result:
+            lbp_result = np.load(f'data/out/{outfile_name}')
+            lbp_result_flattened = lbp_result[patch_mask]
         
     else:
         fastlbp.run_fastlbp(img, radii, npoints, patchsize, ncpus,
         outfile_name=outfile_name, img_name=img_name, save_intermediate_results=save_intermediate_results)
 
         # TODO: refactor this
-        lbp_result = np.load(f'data/out/{outfile_name}')
-        lbp_result_flattened = lbp_result.reshape((-1, lbp_result.shape[-1])) # reshape to 2d <pixel, lbp codes>
+        if flatten_result:
+            lbp_result = np.load(f'data/out/{outfile_name}')
+            lbp_result_flattened = lbp_result.reshape((-1, lbp_result.shape[-1])) # reshape to 2d <pixel, lbp codes>
 
     if flatten_result:
         np.save(f'data/out/{os.path.splitext(outfile_name)[0]}_flattened.npy', lbp_result_flattened)
