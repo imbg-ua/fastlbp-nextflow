@@ -614,7 +614,9 @@ workflow MultiImage {
             imgs_ch = Channel.fromList(imgs)
             imgs_ch
                 .map { tuple(it, params.background_color) }
-            get_tissue_mask(imgs_ch)
+                .set {input_ch_ch}
+
+            get_tissue_mask(input_ch_ch)
 
             get_tissue_mask.out
                 .combine([[lbp_params]])
