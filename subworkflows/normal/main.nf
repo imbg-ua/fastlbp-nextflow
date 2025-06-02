@@ -567,11 +567,15 @@ workflow MultiImage {
            
     } else {
         
-        // DEBUG test is works
-        imgs = params.img_extensions
-            ? files("${params.imgs_dir}/*.{${params.img_extensions.join(',')}}")
-            : files("${params.imgs_dir}/*")
-        
+        if ( params.img_extensions ) {
+            if ( params.img_extensions.size() > 1 ) {
+                imgs = files("${params.imgs_dir}/*.{${params.img_extensions.join(',')}}")
+            } else {
+                imgs = files("${params.imgs_dir}/*.${params.img_extensions[0]}")
+            }
+        } else {
+            imgs = files("${params.imgs_dir}/*")
+        }
 
         if ( !params.masks ) {
             infoLog("No mask mode")
