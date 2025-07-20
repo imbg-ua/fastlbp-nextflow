@@ -1,4 +1,4 @@
-# Nextflow pipeline for fastLBP-based image segmentation
+# Nextflow pipeline for texture descriptor-based image segmentation
 
 ## Key points
 The pipeline supports the following modes:
@@ -16,6 +16,10 @@ The `templates/` folder provides config file templates to run the workflow in di
 ## Examples
 
 ### Grid mode
+
+![grid_search_workflow_example](assets/grid_search_workflow.png)
+Image and annotation from the [IVY GAP dataset](https://glioblastoma.alleninstitute.org/).
+
 ```bash
 nextflow run main.nf -profile conda --mode grid -params-file templates/grid_search_template.yaml
 ```
@@ -27,6 +31,9 @@ nextflow run main.nf -profile conda --mode normal -params-file templates/single_
 ```
 
 ### Process multiple images
+
+![multi_image_workflow_example](assets/multi_image_workflow.png)
+Images from the [IVY GAP dataset](https://glioblastoma.alleninstitute.org/).
 
 ```bash
 nextflow run main.nf -profile conda --mode normal -params-file templates/multiple_images.yaml
