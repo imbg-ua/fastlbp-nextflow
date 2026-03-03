@@ -1,0 +1,3 @@
+run_id	input_np_array	params_str
+image_1	/path/to/image_1_2d_data_np_array.npy	[[method, k_means], [n_clusters, 4]]
+image_2	/path/to/image_2_2d_data_np_array.npy	[[method, k_means], [n_clusters, 2]]

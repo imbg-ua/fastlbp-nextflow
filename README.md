@@ -1,22 +1,65 @@
-# Nextflow pipeline for LBP-based image segmentation
+# Nextflow pipeline for texture descriptor-based image segmentation
 
 ## Key points
 The pipeline supports the following modes:
-- **GridSearch**, where you can specify lists of parameters for each step to run the pipeline using all possible combinations.
+- **GridSearch** which allows you to specify lists of parameters for each step to run the pipeline using all possible combinations.
 - **SingleImage** to process a single image.
-- **MultiImage** to process a folder of images.
+- **MultiImage** to process a set of images.
+
+## Requirements
+**(to be completed)**
 
 ## How to use
 
-### Find best parameters combinations
-To launch in the **GridSearch** mode, use the corresponding template `grid_search_template.yaml` and type:
+The `templates/` folder provides config file templates to run the workflow in different modes. Combined with the `--mode` flag, it automatically determines the execution mode based on the template structure.
+
+## Examples
+
+### Grid mode
+
+![grid_search_workflow_example](assets/grid_search_workflow.png)
+Image and annotation from the [IVY GAP dataset](https://glioblastoma.alleninstitute.org/).
+
 ```bash
-nextflow run grid_search.nf -profile conda -params-file templates/grid_search_template.yaml -entry Pipeline
+nextflow run main.nf -profile conda --mode grid -params-file templates/grid_search_template.yaml
 ```
 
-### Just process my images
+### Process a single image
 
-To run in either **SingleImage** or **MultiImage** mode, choose the corresponding template (e.g. `single_image.yaml`) and run:
 ```bash
-nextflow run main.nf -profile conda -params-file templates/single_image.yaml -entry Pipeline
+nextflow run main.nf -profile conda --mode normal -params-file templates/single_image.yaml
+```
+
+### Process multiple images
+
+![multi_image_workflow_example](assets/multi_image_workflow.png)
+Images from the [IVY GAP dataset](https://glioblastoma.alleninstitute.org/).
+
+```bash
+nextflow run main.nf -profile conda --mode normal -params-file templates/multiple_images.yaml
+```
+
+### fastLBP Only
+
+You can run only `fastLBP` instead of the full analysis pipeline in both Single and Multi Image modes:
+
+```bash
+nextflow run main.nf -profile conda --mode lbp_only -params-file templates/multiple_images.yaml
+```
+
+```bash
+nextflow run main.nf -profile conda --mode lbp_only -params-file templates/single_image.yaml
+```
+
+Alternatively, if you want a more flexible option than using the same set of LBP parameters provided in a YAML file to process all images of interest, you can opt for the `lbp_tsv` mode, which accepts a `TSV` with each run's info on a new line.
+
+```bash
+nextflow run main.nf -profile conda --mode lbp_tsv --lbp_runs_tsv modules/feature_extraction/lbp_only_template.tsv --outdir /path/to/outdir
+```
+
+
+### LSF
+Use LSF configuration file to run pipeline on an LSF cluster.
+```bash
+nextflow run main.nf -profile conda -params-file templates/multiple_images.yaml -c lsf_config.config --mode lbp_only
 ```

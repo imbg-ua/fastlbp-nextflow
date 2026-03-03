@@ -2,6 +2,7 @@
 
 import fire
 import numpy as np
+
 import workflow_utils as ut
 
 
@@ -33,7 +34,6 @@ def labels_to_patch_img(
     labels_img += increment
 
     np.save(savefile, labels_img)    
-
 
 def patch_to_pixel_img(
     np_patch_img_path: str,

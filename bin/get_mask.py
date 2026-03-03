@@ -3,10 +3,12 @@
 import fire
 import numpy as np
 import tifffile as tf
+from PIL import Image
 from scipy import ndimage
 from skimage import filters
+
 import workflow_utils as ut
-from PIL import Image
+
 
 Image.MAX_IMAGE_PIXELS = None
 
@@ -42,9 +44,10 @@ def check_annotations(annotations: str, background_val_str: str = "", savefile: 
     if len(annot.shape) > 2:
         tissue_mask = annot_to_tissue_binmask(annot, background_val)
     elif len(annot.shape) == 2:
+        # TODO: use annot_to_tissue_binmask() as it covers this case as well
         tissue_mask = annot
     else:
-        raise ValuError('Annnotations shape is not valid.')
+        raise ValueError('Annnotations shape is not valid.')
 
     np.save(savefile, tissue_mask)
     

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
 import fire
+
 import workflow_utils as ut
+
 
 def main(params_list_str: str, 
     savefile: str='hash_to_combination.tsv') -> None:

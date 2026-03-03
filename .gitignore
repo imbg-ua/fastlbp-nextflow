@@ -1,7 +1,6 @@
 .nextflow.log*
 .nextflow/
 work/
-report*
 
 **/__pycache__/
 
@@ -22,7 +21,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
