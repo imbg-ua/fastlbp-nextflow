@@ -18,7 +18,7 @@ include { MultiImageLBPTSV } from './subworkflows/other'
 
 nextflow.enable.dsl = 2
 
-pipeline_version = "0.0.2"
+pipeline_version = "0.0.3"
 
 // params.constargs = ''
 

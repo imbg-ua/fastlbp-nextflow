@@ -3,7 +3,7 @@
 
 // TODO: add script-specific default params
 
-pipeline_version = "0.0.2"
+pipeline_version = "0.0.3"
 nextflow.enable.dsl = 2
 
 params.debug_flag = true

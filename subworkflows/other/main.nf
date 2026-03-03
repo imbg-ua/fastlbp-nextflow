@@ -14,7 +14,7 @@ include { convert_annotations_to_binmask;
           downscale_mask } from '../../subworkflows/normal'
 
 nextflow.enable.dsl = 2
-pipeline_version = "0.0.2"
+pipeline_version = "0.0.3"
 
 checkNextflowVersion()
 
